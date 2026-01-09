@@ -1,0 +1,23 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="192" height="192" rx="48" fill="url(#gradient)"/>
+  
+  <!-- Moon Icon -->
+  <g transform="translate(96, 96)">
+    <!-- Crescent Moon -->
+    <path d="M -20 -40 Q -35 -25, -35 0 Q -35 25, -20 40 Q 0 30, 10 0 Q 0 -30, -20 -40 Z" fill="white" opacity="0.95"/>
+    
+    <!-- Stars -->
+    <circle cx="25" cy="-25" r="3" fill="white" opacity="0.8"/>
+    <circle cx="30" cy="10" r="2.5" fill="white" opacity="0.7"/>
+    <circle cx="-30" cy="-15" r="2" fill="white" opacity="0.6"/>
+  </g>
+  
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9333ea"/>
+      <stop offset="50%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#f97316"/>
+    </linearGradient>
+  </defs>
+</svg>
