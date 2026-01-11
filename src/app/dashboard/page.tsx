@@ -343,9 +343,9 @@ export default function DashboardPage() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Dashboard
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
+              {/* <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Anda berhasil login! 🎉
-              </p>
+              </p> */}
 
               {/* Quick Actions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
@@ -540,19 +540,19 @@ export default function DashboardPage() {
 
             {/* Notification Test */}
             <div>
-              <SendNotificationButton />
+              {/* <SendNotificationButton /> */}
             </div>
           </div>
 
           {/* Session Info */}
-          <div className="mt-6 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
+          {/* <div className="mt-6 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
             <h3 className="font-medium text-gray-900 dark:text-white mb-2">
               Session Information:
             </h3>
             <pre className="text-sm text-gray-600 dark:text-gray-300 overflow-x-auto max-h-48">
               {JSON.stringify(session, null, 2)}
             </pre>
-          </div>
+          </div> */}
         </div>
       </div>
 

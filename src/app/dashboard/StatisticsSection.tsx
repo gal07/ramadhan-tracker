@@ -37,6 +37,7 @@ export default function StatisticsSection() {
   const [topActivities, setTopActivities] = useState<Array<{ name: string; count: number; category: string }>>([]);
   const [bestCategory, setBestCategory] = useState<{ name: string; rate: number } | null>(null);
   const [currentStreak, setCurrentStreak] = useState(0);
+  const [perfectDays, setPerfectDays] = useState(0);
 
   useEffect(() => {
     const loadStatistics = async () => {
@@ -135,6 +136,19 @@ export default function StatisticsSection() {
           }
         }
         setCurrentStreak(streak);
+
+        // Hitung Perfect Days (hari dengan 100% completion)
+        let perfectDaysCount = 0;
+        logs.forEach((log) => {
+          const activities = Object.values(log.activities);
+          if (activities.length > 0) {
+            const allCompleted = activities.every(act => act.status === 'completed');
+            if (allCompleted) {
+              perfectDaysCount++;
+            }
+          }
+        });
+        setPerfectDays(perfectDaysCount);
 
         setCategoryStats(categoryData);
         setOverallStats({
@@ -244,10 +258,10 @@ export default function StatisticsSection() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Category Breakdown Bar Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-t-4 border-emerald-500">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-t-4 border-[#2f67b2]">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-10 h-10 bg-[#2f67b2]/10 dark:bg-[#2f67b2]/20 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#2f67b2] dark:text-[#6bc6e5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             </div>
@@ -264,7 +278,7 @@ export default function StatisticsSection() {
               padding={0.3}
               valueScale={{ type: 'linear' }}
               indexScale={{ type: 'band', round: true }}
-              colors={['#22c55e', '#f43f5e']}
+              colors={['#10b981', '#f43f5e']}
               borderColor={{
                 from: 'color',
                 modifiers: [['darker', 1.6]]
@@ -316,7 +330,7 @@ export default function StatisticsSection() {
                     }
                   ],
                   data: [
-                    { id: 'completed', label: 'Selesai', color: '#22c55e' },
+                    { id: 'completed', label: 'Selesai', color: '#10b981' },
                     { id: 'pending', label: 'Belum', color: '#f43f5e' }
                   ]
                 }
@@ -356,10 +370,10 @@ export default function StatisticsSection() {
         </div>
 
         {/* Overall Completion Pie Chart */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-t-4 border-pink-500">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-t-4 border-[#6bc6e5]">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-pink-50 dark:bg-pink-900/20 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-10 h-10 bg-[#6bc6e5]/10 dark:bg-[#6bc6e5]/20 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#6bc6e5] dark:text-[#6bc6e5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
               </svg>
@@ -376,7 +390,7 @@ export default function StatisticsSection() {
               padAngle={0.7}
               cornerRadius={3}
               activeOuterRadiusOffset={8}
-              colors={['#22c55e', '#f43f5e']}
+              colors={['#10b981', '#f43f5e']}
               borderWidth={1}
               borderColor={{
                 from: 'color',
@@ -430,10 +444,10 @@ export default function StatisticsSection() {
       </div>
 
       {/* Summary Info */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-t-4 border-indigo-500">
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-t-4 border-[#2f67b2]">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="w-10 h-10 bg-[#2f67b2]/10 dark:bg-[#2f67b2]/20 rounded-lg flex items-center justify-center">
+            <svg className="w-5 h-5 text-[#2f67b2] dark:text-[#6bc6e5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
@@ -442,45 +456,45 @@ export default function StatisticsSection() {
           </h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+          <div className="bg-linear-to-br from-[#2f67b2]/10 to-[#2f67b2]/20 dark:from-[#2f67b2]/20 dark:to-[#2f67b2]/30 rounded-lg p-4 border border-[#2f67b2]/30 dark:border-[#2f67b2]/50">
             <div className="flex items-center gap-2 mb-1">
-              <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-[#2f67b2] dark:text-[#6bc6e5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">Total Hari Tercatat</p>
+              <p className="text-xs text-[#2f67b2] dark:text-[#6bc6e5] font-medium">Total Hari Tercatat</p>
             </div>
-            <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{dailyLogs.length}</p>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">hari aktivitas</p>
+            <p className="text-2xl font-bold text-[#2f67b2] dark:text-[#6bc6e5]">{dailyLogs.length}</p>
+            <p className="text-xs text-[#2f67b2]/70 dark:text-[#6bc6e5]/70 mt-1">hari aktivitas</p>
           </div>
-          <div className="bg-linear-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+          <div className="bg-linear-to-br from-[#1f4f91]/10 to-[#1f4f91]/20 dark:from-[#2f67b2]/20 dark:to-[#2f67b2]/30 rounded-lg p-4 border border-[#1f4f91]/30 dark:border-[#2f67b2]/50">
             <div className="flex items-center gap-2 mb-1">
-              <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-[#1f4f91] dark:text-[#2f67b2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-xs text-green-700 dark:text-green-300 font-medium">Diselesaikan</p>
+              <p className="text-xs text-[#1f4f91] dark:text-[#2f67b2] font-medium">Diselesaikan</p>
             </div>
-            <p className="text-2xl font-bold text-green-900 dark:text-green-100">{overallStats.completed}</p>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-1">aktivitas</p>
+            <p className="text-2xl font-bold text-[#1f4f91] dark:text-[#2f67b2]">{overallStats.completed}</p>
+            <p className="text-xs text-[#1f4f91]/70 dark:text-[#2f67b2]/70 mt-1">aktivitas</p>
           </div>
-          <div className="bg-linear-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-lg p-4 border border-red-200 dark:border-red-800">
+          <div className="bg-linear-to-br from-[#6bc6e5]/10 to-[#6bc6e5]/20 dark:from-[#6bc6e5]/20 dark:to-[#6bc6e5]/30 rounded-lg p-4 border border-[#6bc6e5]/30 dark:border-[#6bc6e5]/50">
             <div className="flex items-center gap-2 mb-1">
-              <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-[#6bc6e5] dark:text-[#6bc6e5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-xs text-red-700 dark:text-red-300 font-medium">Tertunda</p>
+              <p className="text-xs text-[#6bc6e5] dark:text-[#6bc6e5] font-medium">Tertunda</p>
             </div>
-            <p className="text-2xl font-bold text-red-900 dark:text-red-100">{overallStats.pending}</p>
-            <p className="text-xs text-red-600 dark:text-red-400 mt-1">aktivitas</p>
+            <p className="text-2xl font-bold text-[#6bc6e5] dark:text-[#6bc6e5]">{overallStats.pending}</p>
+            <p className="text-xs text-[#6bc6e5]/70 dark:text-[#6bc6e5]/70 mt-1">aktivitas</p>
           </div>
-          <div className="bg-linear-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+          <div className="bg-linear-to-br from-[#4a8ed8]/10 to-[#4a8ed8]/20 dark:from-[#4a8ed8]/20 dark:to-[#4a8ed8]/30 rounded-lg p-4 border border-[#4a8ed8]/30 dark:border-[#4a8ed8]/50">
             <div className="flex items-center gap-2 mb-1">
-              <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-[#4a8ed8] dark:text-[#4a8ed8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
-              <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">Rata-rata per Hari</p>
+              <p className="text-xs text-[#4a8ed8] dark:text-[#4a8ed8] font-medium">Rata-rata per Hari</p>
             </div>
-            <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">{dailyLogs.length > 0 ? Math.round(overallStats.completed / dailyLogs.length) : 0}</p>
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">aktivitas</p>
+            <p className="text-2xl font-bold text-[#4a8ed8] dark:text-[#4a8ed8]">{dailyLogs.length > 0 ? Math.round(overallStats.completed / dailyLogs.length) : 0}</p>
+            <p className="text-xs text-[#4a8ed8]/70 dark:text-[#4a8ed8]/70 mt-1">aktivitas</p>
           </div>
         </div>
       </div>
@@ -488,45 +502,45 @@ export default function StatisticsSection() {
       {/* New Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top 5 Aktivitas */}
-        <div className="bg-linear-to-br from-[#2f67b2] via-[#3f7fca] to-[#4a8ed8] text-white rounded-xl p-6 shadow-lg">
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-t-4 border-[#2f67b2]">
           <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-10 h-10 bg-[#2f67b2]/10 dark:bg-[#2f67b2]/20 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#2f67b2] dark:text-[#6bc6e5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-white">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Top 5 Aktivitas Favorit
             </h3>
           </div>
           <div className="space-y-3">
             {topActivities.length > 0 ? (
               topActivities.map((activity, index) => (
-                <div key={activity.name} className="flex items-center justify-between p-3 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 hover:bg-white/20 transition-all duration-200">
+                <div key={activity.name} className="flex items-center justify-between p-3 bg-linear-to-br from-[#2f67b2]/5 to-[#6bc6e5]/10 dark:from-[#2f67b2]/10 dark:to-[#6bc6e5]/20 rounded-lg border border-[#2f67b2]/20 dark:border-[#2f67b2]/30 hover:from-[#2f67b2]/10 hover:to-[#6bc6e5]/20 transition-all duration-200">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-lg ${
-                      index === 0 ? 'bg-linear-to-br from-amber-400 to-amber-600 text-white' :
-                      index === 1 ? 'bg-linear-to-br from-gray-300 to-gray-500 text-white' :
-                      index === 2 ? 'bg-linear-to-br from-orange-400 to-orange-600 text-white' :
-                      'bg-white/30 text-white backdrop-blur-sm'
+                      index === 0 ? 'bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white' :
+                      index === 1 ? 'bg-linear-to-br from-[#4a8ed8] to-[#3f7fca] text-white' :
+                      index === 2 ? 'bg-linear-to-br from-[#6bc6e5] to-[#4a8ed8] text-white' :
+                      'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                     }`}>
                       {index + 1}
                     </div>
                     <div>
-                      <p className="font-semibold text-white text-sm">{activity.name}</p>
-                      <p className="text-xs text-white/80">{activity.category}</p>
+                      <p className="font-semibold text-gray-900 dark:text-white text-sm">{activity.name}</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">{activity.category}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm">
-                    <svg className="w-4 h-4 text-amber-300" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="flex items-center gap-1 bg-[#2f67b2]/10 dark:bg-[#2f67b2]/20 px-2 py-1 rounded-full">
+                    <svg className="w-4 h-4 text-[#2f67b2] dark:text-[#6bc6e5]" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
-                    <span className="font-bold text-sm text-white">{activity.count}x</span>
+                    <span className="font-bold text-sm text-[#2f67b2] dark:text-[#6bc6e5]">{activity.count}x</span>
                   </div>
                 </div>
               ))
             ) : (
-              <p className="text-white/80 text-sm text-center py-4">Belum ada data aktivitas</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">Belum ada data aktivitas</p>
             )}
           </div>
         </div>
@@ -534,42 +548,62 @@ export default function StatisticsSection() {
         {/* Achievement Cards */}
         <div className="space-y-4">
           {/* Best Category */}
-          <div className="bg-linear-to-br from-purple-500 to-purple-600 text-white rounded-xl p-6 shadow-lg">
+          <div className="bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white rounded-xl p-6 shadow-lg">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                 </svg>
               </div>
               <div>
-                <p className="text-sm opacity-90">Kategori Terbaik</p>
-                <p className="text-2xl font-bold">{bestCategory?.name || '-'}</p>
+                <p className="text-sm font-semibold text-white/90">Kategori Terbaik</p>
+                <p className="text-2xl font-bold text-white">{bestCategory?.name || '-'}</p>
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-white/20">
-              <p className="text-sm opacity-90">
-                Tingkat penyelesaian: <span className="font-bold text-lg">{bestCategory?.rate || 0}%</span>
+              <p className="text-sm font-semibold text-white/90">
+                Tingkat penyelesaian: <span className="font-bold text-lg text-white">{bestCategory?.rate || 0}%</span>
               </p>
             </div>
           </div>
 
           {/* Current Streak */}
-          <div className="bg-linear-to-br from-orange-500 to-orange-600 text-white rounded-xl p-6 shadow-lg">
+          <div className="bg-linear-to-br from-[#6bc6e5] to-[#4a8ed8] text-white rounded-xl p-6 shadow-lg">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
                 </svg>
               </div>
               <div>
-                <p className="text-sm opacity-90">Konsistensi</p>
-                <p className="text-2xl font-bold">{currentStreak} Hari</p>
+                <p className="text-sm font-semibold text-white/90">Konsistensi</p>
+                <p className="text-2xl font-bold text-white">{currentStreak} Hari</p>
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-white/20">
-              <p className="text-sm opacity-90">
+              <p className="text-sm font-semibold text-white/90">
                 {currentStreak > 0 ? '🔥 Pertahankan semangat Anda!' : '💪 Mulai konsistensi hari ini!'}
+              </p>
+            </div>
+          </div>
+
+          {/* Perfect Days */}
+          <div className="bg-linear-to-br from-[#3f7fca] to-[#2f67b2] text-white rounded-xl p-6 shadow-lg">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white/90">Hari Sempurna</p>
+                <p className="text-2xl font-bold text-white">{perfectDays} Hari</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-white/20">
+              <p className="text-sm font-semibold text-white/90">
+                {perfectDays > 0 ? '⭐ 100% aktivitas diselesaikan!' : '🎯 Capai hari sempurna pertama!'}
               </p>
             </div>
           </div>
