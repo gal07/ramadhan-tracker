@@ -12,7 +12,7 @@ export default withAuth(
         const { pathname } = req.nextUrl;
 
         // Protected routes - hanya bisa diakses jika authenticated
-        if (pathname.startsWith('/dashboard') || pathname.startsWith('/calendar')) {
+        if (pathname.startsWith('/dashboard')) {
           return !!token;
         }
 
