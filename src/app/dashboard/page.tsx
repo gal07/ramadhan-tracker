@@ -615,7 +615,7 @@ export default function DashboardPage() {
             <form onSubmit={handleSaveEvent} className="space-y-4">
               <div>
                 <p className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Checklist Aktivitas (ambil dari Firestore)
+                  Checklist Aktivitas
                 </p>
                 <div className="max-h-48 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2 bg-gray-50 dark:bg-gray-800/60">
                   {loadingActivities && (
@@ -625,7 +625,7 @@ export default function DashboardPage() {
                     <p className="text-sm text-red-600 dark:text-red-400">{activitiesError}</p>
                   )}
                   {!loadingActivities && !activitiesError && activities.length === 0 && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada data aktivitas di Firestore.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Belum ada data aktivitas.</p>
                   )}
                   {!loadingActivities && !activitiesError && activities.length > 0 && (
                     <div className="space-y-3">
