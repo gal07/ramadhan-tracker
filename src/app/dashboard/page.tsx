@@ -3,6 +3,7 @@
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import SendNotificationButton from '@/app/components/SendNotificationButton';
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -142,6 +143,9 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+            
+            {/* Notification Test */}
+            <SendNotificationButton />
             
             {/* Session Info */}
             <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
