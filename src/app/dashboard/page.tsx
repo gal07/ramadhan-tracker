@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import SendNotificationButton from '@/app/components/SendNotificationButton';
+import StatisticsSection from './StatisticsSection';
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [activitiesError, setActivitiesError] = useState('');
+  const [showView, setShowView] = useState<'calendar' | 'statistics'>('calendar');
 
   // Jika tidak authenticated, paksa ke halaman login
   useEffect(() => {
@@ -347,9 +349,18 @@ export default function DashboardPage() {
 
               {/* Quick Actions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-                <div className="p-4 bg-linear-to-br from-[#2f67b2] to-[#1f4f91] hover:from-[#1f4f91] hover:to-[#2f67b2] text-white rounded-xl shadow-lg hover:shadow-xl transition-all text-left">
+                <button
+                  onClick={() => setShowView('calendar')}
+                  className={`p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left ${
+                    showView === 'calendar'
+                      ? 'bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      showView === 'calendar' ? 'bg-white/20' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}>
                       <svg
                         className="w-5 h-5"
                         fill="none"
@@ -366,14 +377,25 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-sm">Kalender Ramadhan</h3>
-                      <p className="text-xs text-[#e8f1fb]">Kelola ibadah Anda</p>
+                      <p className={`text-xs ${
+                        showView === 'calendar' ? 'text-[#e8f1fb]' : 'text-gray-500 dark:text-gray-400'
+                      }`}>Kelola ibadah Anda</p>
                     </div>
                   </div>
-                </div>
+                </button>
 
-                <div className="p-4 bg-linear-to-br from-[#6b6f74] to-[#8791a0] text-white rounded-xl shadow-lg opacity-60 cursor-not-allowed">
+                <button
+                  onClick={() => setShowView('statistics')}
+                  className={`p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left ${
+                    showView === 'statistics'
+                      ? 'bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      showView === 'statistics' ? 'bg-white/20' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}>
                       <svg
                         className="w-5 h-5"
                         fill="none"
@@ -390,14 +412,17 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-sm">Statistik</h3>
-                      <p className="text-xs text-[#e8f1fb]">Segera hadir</p>
+                      <p className={`text-xs ${
+                        showView === 'statistics' ? 'text-[#e8f1fb]' : 'text-gray-500 dark:text-gray-400'
+                      }`}>Lihat progress Anda</p>
                     </div>
                   </div>
-                </div>
+                </button>
               </div>
             </div>
 
-            {/* Calendar */}
+            {/* Calendar or Statistics View */}
+            {showView === 'calendar' ? (
             <div>
               {/* Ramadhan Badge */}
               {hasRamadhanDays && (
@@ -509,6 +534,9 @@ export default function DashboardPage() {
                 </div>
               </div>
             </div>
+            ) : (
+              <StatisticsSection />
+            )}
 
             {/* Notification Test */}
             <div>

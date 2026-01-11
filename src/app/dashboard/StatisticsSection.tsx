@@ -1,0 +1,580 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { ResponsiveBar } from '@nivo/bar';
+import { ResponsivePie } from '@nivo/pie';
+
+interface DailyLog {
+  date: string;
+  activities: Record<string, {
+    name: string;
+    category: string;
+    status: 'completed' | 'pending';
+    time?: string;
+  }>;
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  'Bangun Tidur': '#2f67b2',
+  'Waktu Subuh': '#3f7fca',
+  'Pagi Hari': '#4a8ed8',
+  'Waktu Dzuhur': '#5a9ee6',
+  'Waktu Ashar': '#6bc6e5',
+  'Waktu Maghrib': '#7bcde8',
+  'Waktu Isya': '#8bd5eb',
+  'Waktu Tidur': '#9bddef',
+};
+
+export default function StatisticsSection() {
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
+  const [categoryStats, setCategoryStats] = useState<Array<{ name: string; completed: number; pending: number }>>([]);
+  const [overallStats, setOverallStats] = useState({ total: 0, completed: 0, pending: 0 });
+  const [topActivities, setTopActivities] = useState<Array<{ name: string; count: number; category: string }>>([]);
+  const [bestCategory, setBestCategory] = useState<{ name: string; rate: number } | null>(null);
+  const [currentStreak, setCurrentStreak] = useState(0);
+
+  useEffect(() => {
+    const loadStatistics = async () => {
+      if (!session?.user?.email) return;
+
+      setLoading(true);
+      try {
+        const logsRef = collection(db, 'users', session.user.email, 'daily_logs');
+        const snapshot = await getDocs(logsRef);
+        
+        const logs: DailyLog[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data() as DailyLog;
+          logs.push(data);
+        });
+
+        setDailyLogs(logs);
+
+        // Hitung statistik per kategori
+        const categoryMap = new Map<string, { completed: number; pending: number }>();
+        const activityMap = new Map<string, { count: number; category: string }>();
+        let totalCompleted = 0;
+        let totalPending = 0;
+
+        logs.forEach((log) => {
+          Object.values(log.activities).forEach((activity) => {
+            const category = activity.category;
+            
+            // Category stats
+            if (!categoryMap.has(category)) {
+              categoryMap.set(category, { completed: 0, pending: 0 });
+            }
+            const stats = categoryMap.get(category)!;
+            if (activity.status === 'completed') {
+              stats.completed++;
+              totalCompleted++;
+              
+              // Top activities (hanya yang completed)
+              const actKey = activity.name;
+              if (!activityMap.has(actKey)) {
+                activityMap.set(actKey, { count: 0, category });
+              }
+              activityMap.get(actKey)!.count++;
+            } else {
+              stats.pending++;
+              totalPending++;
+            }
+          });
+        });
+
+        const categoryData = Array.from(categoryMap.entries()).map(([name, stats]) => ({
+          name,
+          completed: stats.completed,
+          pending: stats.pending,
+        }));
+
+        // Top 5 aktivitas paling sering diselesaikan
+        const topActs = Array.from(activityMap.entries())
+          .map(([name, data]) => ({ name, ...data }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5);
+        setTopActivities(topActs);
+
+        // Kategori dengan completion rate tertinggi
+        const categoryRates = categoryData
+          .map(cat => ({
+            name: cat.name,
+            rate: cat.completed + cat.pending > 0 
+              ? Math.round((cat.completed / (cat.completed + cat.pending)) * 100)
+              : 0
+          }))
+          .sort((a, b) => b.rate - a.rate);
+        setBestCategory(categoryRates[0] || null);
+
+        // Hitung streak (hari berturut-turut dengan aktivitas completed)
+        const sortedLogs = logs
+          .map(log => ({
+            date: new Date(log.date),
+            hasCompleted: Object.values(log.activities).some(act => act.status === 'completed')
+          }))
+          .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+        let streak = 0;
+        for (let i = 0; i < sortedLogs.length; i++) {
+          if (sortedLogs[i].hasCompleted) {
+            streak++;
+            // Check if next day is consecutive
+            if (i < sortedLogs.length - 1) {
+              const currentDate = sortedLogs[i].date;
+              const nextDate = sortedLogs[i + 1].date;
+              const diffDays = Math.floor((currentDate.getTime() - nextDate.getTime()) / (1000 * 60 * 60 * 24));
+              if (diffDays > 1) break; // Gap ditemukan
+            }
+          } else {
+            break;
+          }
+        }
+        setCurrentStreak(streak);
+
+        setCategoryStats(categoryData);
+        setOverallStats({
+          total: totalCompleted + totalPending,
+          completed: totalCompleted,
+          pending: totalPending,
+        });
+      } catch (error) {
+        console.error('Gagal memuat statistik:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStatistics();
+  }, [session]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-gray-600 dark:text-gray-400">Memuat statistik...</div>
+      </div>
+    );
+  }
+
+  if (dailyLogs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <svg
+          className="w-16 h-16 text-gray-400 mb-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+          />
+        </svg>
+        <p className="text-gray-600 dark:text-gray-400 text-center">
+          Belum ada data aktivitas.
+          <br />
+          Mulai isi checklist harian untuk melihat statistik Anda.
+        </p>
+      </div>
+    );
+  }
+
+  const completionRate = overallStats.total > 0 
+    ? Math.round((overallStats.completed / overallStats.total) * 100) 
+    : 0;
+
+  const pieData = [
+    { id: 'completed', label: 'Selesai', value: overallStats.completed, color: '#10b981' },
+    { id: 'pending', label: 'Belum', value: overallStats.pending, color: '#ef4444' },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Overall Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white rounded-xl p-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm opacity-90">Total Aktivitas</p>
+              <p className="text-3xl font-bold mt-1">{overallStats.total}</p>
+            </div>
+            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-linear-to-br from-green-500 to-green-600 text-white rounded-xl p-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm opacity-90">Diselesaikan</p>
+              <p className="text-3xl font-bold mt-1">{overallStats.completed}</p>
+            </div>
+            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-linear-to-br from-[#6bc6e5] to-[#4a8ed8] text-white rounded-xl p-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm opacity-90">Tingkat Penyelesaian</p>
+              <p className="text-3xl font-bold mt-1">{completionRate}%</p>
+            </div>
+            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Category Breakdown Bar Chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-t-4 border-emerald-500">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Aktivitas per Kategori
+            </h3>
+          </div>
+          <div style={{ height: '300px' }}>
+            <ResponsiveBar
+              data={categoryStats}
+              keys={['completed', 'pending']}
+              indexBy="name"
+              margin={{ top: 20, right: 20, bottom: 80, left: 60 }}
+              padding={0.3}
+              valueScale={{ type: 'linear' }}
+              indexScale={{ type: 'band', round: true }}
+              colors={['#22c55e', '#f43f5e']}
+              borderColor={{
+                from: 'color',
+                modifiers: [['darker', 1.6]]
+              }}
+              axisTop={null}
+              axisRight={null}
+              axisBottom={{
+                tickSize: 5,
+                tickPadding: 5,
+                tickRotation: -45,
+                legend: '',
+                legendPosition: 'middle',
+                legendOffset: 32
+              }}
+              axisLeft={{
+                tickSize: 5,
+                tickPadding: 5,
+                tickRotation: 0,
+                legend: 'Jumlah',
+                legendPosition: 'middle',
+                legendOffset: -45
+              }}
+              labelSkipWidth={12}
+              labelSkipHeight={12}
+              labelTextColor={{
+                from: 'color',
+                modifiers: [['darker', 1.6]]
+              }}
+              legends={[
+                {
+                  dataFrom: 'keys',
+                  anchor: 'bottom-right',
+                  direction: 'column',
+                  justify: false,
+                  translateX: 0,
+                  translateY: -70,
+                  itemsSpacing: 2,
+                  itemWidth: 100,
+                  itemHeight: 20,
+                  itemDirection: 'left-to-right',
+                  itemOpacity: 0.85,
+                  symbolSize: 20,
+                  effects: [
+                    {
+                      on: 'hover',
+                      style: {
+                        itemOpacity: 1
+                      }
+                    }
+                  ],
+                  data: [
+                    { id: 'completed', label: 'Selesai', color: '#22c55e' },
+                    { id: 'pending', label: 'Belum', color: '#f43f5e' }
+                  ]
+                }
+              ]}
+              role="application"
+              ariaLabel="Grafik aktivitas per kategori"
+              animate={true}
+              motionConfig="gentle"
+              theme={{
+                axis: {
+                  ticks: {
+                    text: {
+                      fontSize: 11,
+                      fill: '#6b7280'
+                    }
+                  },
+                  legend: {
+                    text: {
+                      fontSize: 12,
+                      fill: '#374151',
+                      fontWeight: 600
+                    }
+                  }
+                },
+                tooltip: {
+                  container: {
+                    background: '#1f2937',
+                    color: '#fff',
+                    fontSize: '12px',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Overall Completion Pie Chart */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-t-4 border-pink-500">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-10 h-10 bg-pink-50 dark:bg-pink-900/20 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Status Keseluruhan
+            </h3>
+          </div>
+          <div style={{ height: '300px' }}>
+            <ResponsivePie
+              data={pieData}
+              margin={{ top: 20, right: 80, bottom: 20, left: 80 }}
+              innerRadius={0.5}
+              padAngle={0.7}
+              cornerRadius={3}
+              activeOuterRadiusOffset={8}
+              colors={['#22c55e', '#f43f5e']}
+              borderWidth={1}
+              borderColor={{
+                from: 'color',
+                modifiers: [['darker', 0.2]]
+              }}
+              arcLinkLabelsSkipAngle={10}
+              arcLinkLabelsTextColor="#6b7280"
+              arcLinkLabelsThickness={2}
+              arcLinkLabelsColor={{ from: 'color' }}
+              arcLabelsSkipAngle={10}
+              arcLabelsTextColor={{
+                from: 'color',
+                modifiers: [['darker', 2]]
+              }}
+              arcLabel={(d) => `${d.value}`}
+              tooltip={({ datum }) => (
+                <div className="bg-gray-900 text-white px-3 py-2 rounded-lg shadow-xl text-xs font-medium">
+                  <strong>{datum.label}</strong>: {datum.value} ({Math.round((datum.value / overallStats.total) * 100)}%)
+                </div>
+              )}
+              legends={[
+                {
+                  anchor: 'bottom',
+                  direction: 'row',
+                  justify: false,
+                  translateX: 0,
+                  translateY: 20,
+                  itemsSpacing: 10,
+                  itemWidth: 100,
+                  itemHeight: 18,
+                  itemTextColor: '#6b7280',
+                  itemDirection: 'left-to-right',
+                  itemOpacity: 1,
+                  symbolSize: 18,
+                  symbolShape: 'circle',
+                  effects: [
+                    {
+                      on: 'hover',
+                      style: {
+                        itemTextColor: '#374151'
+                      }
+                    }
+                  ]
+                }
+              ]}
+              animate={true}
+              motionConfig="gentle"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Summary Info */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border-t-4 border-indigo-500">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg flex items-center justify-center">
+            <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Ringkasan
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">Total Hari Tercatat</p>
+            </div>
+            <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{dailyLogs.length}</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">hari aktivitas</p>
+          </div>
+          <div className="bg-linear-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-green-700 dark:text-green-300 font-medium">Diselesaikan</p>
+            </div>
+            <p className="text-2xl font-bold text-green-900 dark:text-green-100">{overallStats.completed}</p>
+            <p className="text-xs text-green-600 dark:text-green-400 mt-1">aktivitas</p>
+          </div>
+          <div className="bg-linear-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-lg p-4 border border-red-200 dark:border-red-800">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-xs text-red-700 dark:text-red-300 font-medium">Tertunda</p>
+            </div>
+            <p className="text-2xl font-bold text-red-900 dark:text-red-100">{overallStats.pending}</p>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-1">aktivitas</p>
+          </div>
+          <div className="bg-linear-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+              <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">Rata-rata per Hari</p>
+            </div>
+            <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">{dailyLogs.length > 0 ? Math.round(overallStats.completed / dailyLogs.length) : 0}</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">aktivitas</p>
+          </div>
+        </div>
+      </div>
+
+      {/* New Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top 5 Aktivitas */}
+        <div className="bg-linear-to-br from-[#2f67b2] via-[#3f7fca] to-[#4a8ed8] text-white rounded-xl p-6 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-white">
+              Top 5 Aktivitas Favorit
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {topActivities.length > 0 ? (
+              topActivities.map((activity, index) => (
+                <div key={activity.name} className="flex items-center justify-between p-3 bg-white/10 backdrop-blur-sm rounded-lg border border-white/20 hover:bg-white/20 transition-all duration-200">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-lg ${
+                      index === 0 ? 'bg-linear-to-br from-amber-400 to-amber-600 text-white' :
+                      index === 1 ? 'bg-linear-to-br from-gray-300 to-gray-500 text-white' :
+                      index === 2 ? 'bg-linear-to-br from-orange-400 to-orange-600 text-white' :
+                      'bg-white/30 text-white backdrop-blur-sm'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-white text-sm">{activity.name}</p>
+                      <p className="text-xs text-white/80">{activity.category}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full backdrop-blur-sm">
+                    <svg className="w-4 h-4 text-amber-300" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    <span className="font-bold text-sm text-white">{activity.count}x</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-white/80 text-sm text-center py-4">Belum ada data aktivitas</p>
+            )}
+          </div>
+        </div>
+
+        {/* Achievement Cards */}
+        <div className="space-y-4">
+          {/* Best Category */}
+          <div className="bg-linear-to-br from-purple-500 to-purple-600 text-white rounded-xl p-6 shadow-lg">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm opacity-90">Kategori Terbaik</p>
+                <p className="text-2xl font-bold">{bestCategory?.name || '-'}</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-white/20">
+              <p className="text-sm opacity-90">
+                Tingkat penyelesaian: <span className="font-bold text-lg">{bestCategory?.rate || 0}%</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Current Streak */}
+          <div className="bg-linear-to-br from-orange-500 to-orange-600 text-white rounded-xl p-6 shadow-lg">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm opacity-90">Konsistensi</p>
+                <p className="text-2xl font-bold">{currentStreak} Hari</p>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-white/20">
+              <p className="text-sm opacity-90">
+                {currentStreak > 0 ? '🔥 Pertahankan semangat Anda!' : '💪 Mulai konsistensi hari ini!'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
