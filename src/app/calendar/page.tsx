@@ -19,6 +19,13 @@ export default function CalendarPage() {
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [activitiesError, setActivitiesError] = useState('');
 
+  // Check auth dan redirect jika tidak authenticated
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace('/');
+    }
+  }, [status, router]);
+
   const CATEGORY_ORDER: Array<{ key: string; label: string }> = [
     { key: 'bangun_tidur', label: 'Bangun Tidur' },
     { key: 'waktu_subuh', label: 'Waktu Subuh' },
@@ -80,7 +87,6 @@ export default function CalendarPage() {
   }
 
   if (!session) {
-    router.push('/');
     return null;
   }
 

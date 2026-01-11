@@ -9,13 +9,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [status, setStatus] = useState<'loading' | 'authenticated' | 'unauthenticated'>('loading');
   const { data: session } = useSession();
   const router = useRouter();
-
-  // Redirect jika sudah login
+  console.log('Session data:', session);
+  // Check session status dan handle redirect
   useEffect(() => {
     if (session) {
       router.push('/dashboard');
+    } else {
+      setStatus('unauthenticated');
     }
   }, [session, router]);
 

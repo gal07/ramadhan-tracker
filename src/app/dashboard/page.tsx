@@ -2,25 +2,36 @@
 
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  if (status === 'loading') {
+  // Redirect to home jika unauthenticated (hanya jika bukan sedang logout)
+  useEffect(() => {
+    if (status === 'unauthenticated' && !isLoggingOut) {
+      router.replace('/');
+    }
+  }, [status, isLoggingOut, router]);
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    // Langsung signOut tanpa menunggu
+    await signOut({ callbackUrl: '/', redirect: true });
+  };
+
+  if (status === 'loading' || isLoggingOut) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-lg">Memuat...</div>
+        <div className="text-lg">{isLoggingOut ? 'Logging out...' : 'Memuat...'}</div>
       </div>
     );
   }
 
   if (!session) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-lg">Redirecting...</div>
-      </div>
-    );
+    return null;
   }
 
   return (
@@ -48,7 +59,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <button
-                onClick={() => signOut({ callbackUrl: '/' })}
+                onClick={handleLogout}
                 className="bg-[#6b6f74] hover:bg-[#55585c] text-white font-medium py-2 px-4 rounded-lg transition-colors"
               >
                 Logout
