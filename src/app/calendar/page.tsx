@@ -19,12 +19,13 @@ export default function CalendarPage() {
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [activitiesError, setActivitiesError] = useState('');
 
-  // Check auth dan redirect jika tidak authenticated
+  // Jika tidak authenticated, paksa ke halaman login
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.replace('/');
     }
   }, [status, router]);
+
 
   const CATEGORY_ORDER: Array<{ key: string; label: string }> = [
     { key: 'bangun_tidur', label: 'Bangun Tidur' },
@@ -78,16 +79,13 @@ export default function CalendarPage() {
     loadActivities();
   }, [status]);
 
-  if (status === 'loading') {
+  // Tampilkan loader sampai benar-benar authenticated untuk hindari blank screen
+  if (status !== 'authenticated') {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-lg">Memuat...</div>
       </div>
     );
-  }
-
-  if (!session) {
-    return null;
   }
 
   // Helper functions untuk kalender

@@ -10,6 +10,7 @@ const handler = NextAuth({
     }),
   ],
   session: {
+    strategy: "jwt", // Penting: gunakan JWT strategy
     maxAge: 24 * 60 * 60, // 24 hours
     updateAge: 24 * 60 * 60, // Re-validate once a day
   },

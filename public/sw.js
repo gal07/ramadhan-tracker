@@ -2,8 +2,6 @@
 const CACHE_NAME = 'ramadhan-tracker-v1';
 const urlsToCache = [
   '/',
-  '/dashboard',
-  '/calendar',
   '/manifest.json',
   '/ybm_logo.png',
   '/favicon.ico',
@@ -35,33 +33,41 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Jangan cache route yang sensitif terhadap auth
+  const isAuthSensitive = (
+    url.pathname.startsWith('/dashboard') ||
+    url.pathname.startsWith('/calendar') ||
+    url.pathname.startsWith('/api/auth')
+  );
+
+  if (isAuthSensitive) {
+    // Selalu network-first tanpa menyentuh cache
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // Default: cache-first untuk aset publik
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Cache hit - return response
-        if (response) {
-          return response;
+    caches.match(event.request).then((response) => {
+      if (response) {
+        return response;
+      }
+
+      const fetchRequest = event.request.clone();
+      return fetch(fetchRequest).then((networkResponse) => {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
         }
 
-        // Clone the request
-        const fetchRequest = event.request.clone();
-
-        return fetch(fetchRequest).then((response) => {
-          // Check if valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
-            return response;
-          }
-
-          // Clone the response
-          const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME)
-            .then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
-
-          return response;
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
         });
-      })
+
+        return networkResponse;
+      });
+    })
   );
 });

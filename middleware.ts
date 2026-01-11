@@ -3,15 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export default withAuth(
   function middleware(request: NextRequest) {
-    const { pathname } = request.nextUrl;
-    const token = request.nextauth.token;
-
-    // Jika sudah authenticated dan coba akses root (/), redirect ke dashboard
-    if (pathname === '/' && token) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
-
-    // Jika belum authenticated dan coba akses protected routes, akan di-handle oleh withAuth
+    // Semua routing publik akan lewat, proteksi dilakukan via callbacks.authorized
     return NextResponse.next();
   },
   {

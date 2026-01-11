@@ -9,29 +9,42 @@ export default function DashboardPage() {
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Redirect to home jika unauthenticated (hanya jika bukan sedang logout)
+  // Jika tidak authenticated, paksa ke halaman login
   useEffect(() => {
-    if (status === 'unauthenticated' && !isLoggingOut) {
+    if (status === 'unauthenticated') {
       router.replace('/');
     }
-  }, [status, isLoggingOut, router]);
+  }, [status, router]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    // Langsung signOut tanpa menunggu
-    await signOut({ callbackUrl: '/', redirect: true });
+    try {
+      // SignOut akan clear session dan cookies
+      await signOut({ 
+        redirect: false // Jangan auto redirect, kita handle manual
+      });
+      // Force redirect menggunakan window.location untuk clear semua state
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Logout error:', error);
+      setIsLoggingOut(false);
+    }
   };
 
-  if (status === 'loading' || isLoggingOut) {
+  if (isLoggingOut) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-lg">{isLoggingOut ? 'Logging out...' : 'Memuat...'}</div>
+        <div className="text-lg">Logging out...</div>
       </div>
     );
   }
-
-  if (!session) {
-    return null;
+  // Tampilkan loader sampai benar-benar authenticated untuk hindari blank screen
+  if (status !== 'authenticated') {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-lg">Memuat...</div>
+      </div>
+    );
   }
 
   return (
