@@ -9,16 +9,17 @@ export function FCMProvider() {
 
   useEffect(() => {
     // Only setup FCM if user is authenticated
-    if (!session?.user?.email) return;
+    const email = session?.user?.email;
+    if (!email) return;
 
     const setupFCM = async () => {
       try {
         // Request notification permission and get token
         const token = await requestNotificationPermission();
-        
-        if (token && session.user.email) {
+
+        if (token) {
           // Save token to database
-          await saveFCMTokenToDatabase(session.user.email, token);
+          await saveFCMTokenToDatabase(email, token);
           
           // Setup foreground notification listener
           setupForegroundNotifications();
