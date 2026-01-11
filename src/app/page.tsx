@@ -33,7 +33,7 @@ export default function LoginPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4 overflow-hidden">
       {/* Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#2f67b2] via-[#3f7fca] to-[#6bc6e5] dark:from-[#1f4f91] dark:via-[#2f67b2] dark:to-[#3f8ad6]">
+      <div className="absolute inset-0 bg-linear-to-br from-[#2f67b2] via-[#3f7fca] to-[#6bc6e5] dark:from-[#1f4f91] dark:via-[#2f67b2] dark:to-[#3f8ad6]">
         {/* Floating Circles */}
         <div className="absolute top-20 left-10 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-float"></div>
         <div className="absolute bottom-20 right-10 w-96 h-96 bg-[#6bc6e5]/25 rounded-full blur-3xl animate-float-delay"></div>
@@ -58,7 +58,7 @@ export default function LoginPage() {
                 className="w-40 h-auto mx-auto"
               />
             </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-[#2f67b2] to-[#6bc6e5] dark:from-[#6bc6e5] dark:to-[#2f67b2] bg-clip-text text-transparent mb-2">
+            <h1 className="text-3xl font-bold bg-linear-to-r from-[#2f67b2] to-[#6bc6e5] dark:from-[#6bc6e5] dark:to-[#2f67b2] bg-clip-text text-transparent mb-2">
               Selamat Datang
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mb-8">

@@ -1,4 +1,4 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
@@ -12,12 +12,11 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase (reuse existing instance if available)
-let app = null;
-try {
+let app: FirebaseApp;
+if (!getApps().length) {
   app = initializeApp(firebaseConfig);
-} catch (error) {
-  // App already initialized
-  app = require('firebase/app').getApp();
+} else {
+  app = getApp();
 }
 
 /**

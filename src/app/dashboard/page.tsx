@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { addDoc, collection, getDocs, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import SendNotificationButton from '@/app/components/SendNotificationButton';
 
 export default function DashboardPage() {
@@ -18,6 +18,7 @@ export default function DashboardPage() {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [activities, setActivities] = useState<Array<{ id: string; name: string; category: string; categoryLabel: string; icon?: string; order?: number }>>([]);
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
@@ -151,6 +152,10 @@ export default function DashboardPage() {
     setCurrentDate(new Date());
   };
 
+  const getDateKey = (year: number, monthZeroBased: number, day: number) => {
+    return `${year}-${String(monthZeroBased + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+
   // Periode Ramadhan: 18 Februari - 19 Maret 2026
   const RAMADHAN_YEAR = 2026;
   const RAMADHAN_START = new Date(2026, 1, 18); // 18 Februari (bulan 1 = Februari)
@@ -177,7 +182,7 @@ export default function DashboardPage() {
     );
   };
 
-  const handleDayClick = (day: number) => {
+  const handleDayClick = async (day: number) => {
     if (!isDateInRamadhan(day)) {
       // Tampilkan notifikasi custom
       setShowNotification(true);
@@ -188,6 +193,20 @@ export default function DashboardPage() {
     setSelectedDay(day);
     setSelectedActivities([]);
     setShowEventModal(true);
+
+    const userEmail = session?.user?.email ?? '';
+    if (userEmail) {
+      const dateKey = getDateKey(currentDate.getFullYear(), currentDate.getMonth(), day);
+      const docId = `${userEmail}_${dateKey}`;
+      const snap = await getDoc(doc(db, 'users', userEmail, 'daily_logs', docId));
+      const data = snap.data() as { activities?: Record<string, { status?: string }> } | undefined;
+      if (data?.activities) {
+        const completedIds = Object.entries(data.activities)
+          .filter(([, value]) => value?.status === 'completed')
+          .map(([id]) => id);
+        setSelectedActivities(completedIds);
+      }
+    }
   };
 
   const handleCloseModal = () => {
@@ -200,12 +219,20 @@ export default function DashboardPage() {
     e.preventDefault();
     if (!selectedDay) return;
 
+    if (selectedActivities.length === 0) {
+      setSaveError('Pilih minimal satu aktivitas sebelum menyimpan.');
+      setTimeout(() => setSaveError(null), 3200);
+      return;
+    }
+
     try {
       const eventDate = new Date(
         currentDate.getFullYear(),
         currentDate.getMonth(),
         selectedDay
       );
+
+      const dateKey = getDateKey(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
 
       await addDoc(collection(db, 'events'), {
         userEmail: session?.user?.email ?? null,
@@ -216,10 +243,42 @@ export default function DashboardPage() {
         createdAt: serverTimestamp(),
       });
 
+      // Simpan status harian ke subcollection daily_logs
+      const userEmail = session?.user?.email ?? '';
+      if (userEmail) {
+        const docId = `${userEmail}_${dateKey}`;
+        const now = new Date().toISOString();
+
+        const activityMap = activities.reduce<Record<string, { name: string; category: string; status: 'completed' | 'pending'; time?: string }>>((acc, act) => {
+          const isDone = selectedActivities.includes(act.id);
+          acc[act.id] = {
+            name: act.name,
+            category: act.categoryLabel ?? act.category,
+            status: isDone ? 'completed' : 'pending',
+            ...(isDone ? { time: now } : {}),
+          };
+          return acc;
+        }, {});
+
+        const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
+
+        await setDoc(
+          doc(db, 'users', userEmail, 'daily_logs', docId),
+          {
+            userId,
+            date: dateKey,
+            activities: activityMap,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+
       handleCloseModal();
     } catch (error) {
       console.error('Gagal menyimpan event:', error);
-      // Optional: tampilkan notifikasi gagal
+      setSaveError('Gagal menyimpan data. Silakan coba lagi.');
+      setTimeout(() => setSaveError(null), 3200);
     }
   };
 
@@ -240,7 +299,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[var(--ybm-light)] via-[#cfe3f7] to-[#6bc6e5]/30 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-linear-to-br from-(--ybm-light) via-[#cfe3f7] to-[#6bc6e5]/30 dark:from-gray-900 dark:to-gray-800">
       <div className="absolute -top-20 -left-10 w-64 h-64 bg-[#2f67b2]/20 blur-3xl rounded-full pointer-events-none" />
       <div className="absolute bottom-0 right-0 w-80 h-80 bg-[#6bc6e5]/25 blur-3xl rounded-full pointer-events-none" />
 
@@ -288,9 +347,9 @@ export default function DashboardPage() {
 
               {/* Quick Actions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-                <div className="p-4 bg-gradient-to-br from-[#2f67b2] to-[#1f4f91] hover:from-[#1f4f91] hover:to-[#2f67b2] text-white rounded-xl shadow-lg hover:shadow-xl transition-all text-left">
+                <div className="p-4 bg-linear-to-br from-[#2f67b2] to-[#1f4f91] hover:from-[#1f4f91] hover:to-[#2f67b2] text-white rounded-xl shadow-lg hover:shadow-xl transition-all text-left">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
                       <svg
                         className="w-5 h-5"
                         fill="none"
@@ -312,9 +371,9 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="p-4 bg-gradient-to-br from-[#6b6f74] to-[#8791a0] text-white rounded-xl shadow-lg opacity-60 cursor-not-allowed">
+                <div className="p-4 bg-linear-to-br from-[#6b6f74] to-[#8791a0] text-white rounded-xl shadow-lg opacity-60 cursor-not-allowed">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center shrink-0">
                       <svg
                         className="w-5 h-5"
                         fill="none"
@@ -342,7 +401,7 @@ export default function DashboardPage() {
             <div>
               {/* Ramadhan Badge */}
               {hasRamadhanDays && (
-                <div className="mb-4 p-3 bg-gradient-to-r from-[#2f67b2] to-[#6bc6e5] text-white rounded-lg text-center">
+                <div className="mb-4 p-3 bg-linear-to-r from-[#2f67b2] to-[#6bc6e5] text-white rounded-lg text-center">
                   <p className="font-semibold">🌙 Bulan Ramadhan 1447 H</p>
                   <p className="text-sm mt-1">
                     {currentMonth === 1 
@@ -472,8 +531,8 @@ export default function DashboardPage() {
       {/* Custom Notification Toast */}
       {showNotification && (
         <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 animate-slideDown">
-          <div className="bg-gradient-to-r from-[#2f67b2] to-[#6bc6e5] text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md">
-            <div className="flex-shrink-0">
+          <div className="bg-linear-to-r from-[#2f67b2] to-[#6bc6e5] text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md">
+            <div className="shrink-0">
               <svg
                 className="w-6 h-6"
                 fill="none"
@@ -496,7 +555,7 @@ export default function DashboardPage() {
             </div>
             <button
               onClick={() => setShowNotification(false)}
-              className="flex-shrink-0 hover:bg-white/20 rounded-lg p-1 transition-colors"
+              className="shrink-0 hover:bg-white/20 rounded-lg p-1 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -507,6 +566,37 @@ export default function DashboardPage() {
       {/* Event Modal */}
       {showEventModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          {saveError && (
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50">
+              <div className="bg-red-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 min-w-[320px] max-w-md animate-slideDown">
+                <div className="shrink-0">
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">Gagal menyimpan</p>
+                  <p className="text-xs mt-0.5 text-white/90">{saveError}</p>
+                </div>
+                <button
+                  onClick={() => setSaveError(null)}
+                  className="shrink-0 hover:bg-white/20 rounded-lg p-1 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full p-6">
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-4">
@@ -584,7 +674,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-[#2f67b2] to-[#6bc6e5] text-white rounded-lg hover:from-[#1f4f91] hover:to-[#2f67b2] transition-colors font-medium shadow-lg"
+                  className="flex-1 px-4 py-3 bg-linear-to-r from-[#2f67b2] to-[#6bc6e5] text-white rounded-lg hover:from-[#1f4f91] hover:to-[#2f67b2] transition-colors font-medium shadow-lg"
                 >
                   Simpan Event
                 </button>
