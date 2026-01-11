@@ -25,6 +25,11 @@ export default function DashboardPage() {
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [activitiesError, setActivitiesError] = useState('');
   const [showView, setShowView] = useState<'calendar' | 'statistics'>('calendar');
+  
+  // Notification permission states
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [showNotificationBanner, setShowNotificationBanner] = useState(false);
+  const [notificationRequestStatus, setNotificationRequestStatus] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null);
 
   // Jika tidak authenticated, paksa ke halaman login
   useEffect(() => {
@@ -32,6 +37,23 @@ export default function DashboardPage() {
       router.replace('/');
     }
   }, [status, router]);
+
+  // Check notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+      
+      // Check if banner was dismissed before
+      const dismissed = localStorage.getItem('notification-banner-dismissed');
+      
+      // Show banner if permission is default and not dismissed
+      if (Notification.permission === 'default' && dismissed !== 'true') {
+        setTimeout(() => {
+          setShowNotificationBanner(true);
+        }, 2000);
+      }
+    }
+  }, []);
 
   // Calendar constants
   const CATEGORY_ORDER: Array<{ key: string; label: string }> = [
@@ -44,6 +66,87 @@ export default function DashboardPage() {
     { key: 'waktu_isya', label: 'Waktu Isya' },
     { key: 'waktu_tidur', label: 'Waktu Tidur' },
   ];
+
+  // Request notification permission
+  const handleRequestNotification = async () => {
+    if (typeof window === 'undefined') return;
+
+    // Reset status message on every click
+    setNotificationRequestStatus({ type: 'info', message: 'Meminta izin notifikasi...' });
+
+    if (!('Notification' in window)) {
+      setNotificationRequestStatus({ type: 'error', message: 'Browser Anda tidak mendukung notifikasi.' });
+      alert('Browser Anda tidak mendukung notifikasi.');
+      return;
+    }
+    if (!window.isSecureContext) {
+      setNotificationRequestStatus({ type: 'error', message: 'Aktifkan HTTPS atau gunakan localhost agar izin bisa diminta.' });
+      alert('Aktifkan HTTPS atau gunakan localhost untuk mengizinkan notifikasi.');
+      return;
+    }
+
+    // Helper: show a sample notification via service worker when possible
+    const showNotificationPreview = async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const registration = await navigator.serviceWorker.ready;
+          await registration.showNotification('Notifikasi Aktif! 🎉', {
+            body: 'Anda akan menerima pengingat ibadah dari Ramadhan Tracker',
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+          });
+          return;
+        }
+
+        new Notification('Notifikasi Aktif! 🎉', {
+          body: 'Anda akan menerima pengingat ibadah dari Ramadhan Tracker',
+          icon: '/icon-192x192.png',
+          badge: '/icon-192x192.png',
+        });
+      } catch (error) {
+        console.error('Error showing notification preview:', error);
+      }
+    };
+
+    try {
+      // If already granted, do not prompt again — just show feedback
+      if (Notification.permission === 'granted') {
+        setNotificationPermission('granted');
+        setShowNotificationBanner(false);
+        await showNotificationPreview();
+        setNotificationRequestStatus({ type: 'success', message: 'Notifikasi sudah aktif.' });
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      const resolvedPermission = permission ?? Notification.permission ?? 'default';
+      setNotificationPermission(resolvedPermission);
+
+      if (resolvedPermission === 'granted') {
+        setShowNotificationBanner(false);
+        await showNotificationPreview();
+        setNotificationRequestStatus({ type: 'success', message: 'Notifikasi berhasil diaktifkan.' });
+        return;
+      }
+
+      if (resolvedPermission === 'denied') {
+        setShowNotificationBanner(false);
+        setNotificationRequestStatus({ type: 'error', message: 'Notifikasi diblokir. Aktifkan lewat pengaturan browser lalu coba lagi.' });
+        return;
+      }
+
+      setNotificationRequestStatus({ type: 'info', message: 'Izin belum diputuskan. Coba klik ulang atau buka pengaturan notifikasi browser.' });
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      setNotificationRequestStatus({ type: 'error', message: 'Gagal meminta izin notifikasi. Coba lagi.' });
+      alert('Gagal meminta izin notifikasi. Coba lagi.');
+    }
+  };
+
+  const handleDismissNotificationBanner = () => {
+    setShowNotificationBanner(false);
+    localStorage.setItem('notification-banner-dismissed', 'true');
+  };
 
   // Load activities from Firestore
   useEffect(() => {
@@ -307,6 +410,85 @@ export default function DashboardPage() {
 
       <div className="container mx-auto px-4 py-8 relative z-10">
         <div className="max-w-6xl mx-auto">
+          {notificationRequestStatus && (
+            <div
+              className={`mb-4 rounded-xl border p-3 text-sm flex items-center gap-2 ${
+                notificationRequestStatus.type === 'success'
+                  ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
+                  : notificationRequestStatus.type === 'error'
+                  ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
+                  : 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200'
+              }`}
+            >
+              <span className="text-base">🔔</span>
+              <span>{notificationRequestStatus.message}</span>
+            </div>
+          )}
+
+          {/* Notification Permission Banner */}
+          {showNotificationBanner && notificationPermission === 'default' && (
+            <div className="mb-6">
+              <div className="bg-linear-to-r from-[#2f67b2] to-[#6bc6e5] rounded-2xl shadow-xl p-4 flex items-center gap-4">
+                <div className="shrink-0">
+                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-white font-semibold text-sm mb-1">
+                    🔔 Aktifkan Notifikasi
+                  </h3>
+                  <p className="text-white/90 text-xs">
+                    Dapatkan pengingat untuk sholat, puasa, dan aktivitas ibadah Anda
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleRequestNotification}
+                    className="px-4 py-2 bg-white text-[#2f67b2] rounded-lg font-medium text-sm hover:bg-white/90 transition-colors shadow-lg"
+                  >
+                    Aktifkan
+                  </button>
+                  <button
+                    onClick={handleDismissNotificationBanner}
+                    className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Notification Denied Warning */}
+          {notificationPermission === 'denied' && (
+            <div className="mb-6">
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-center gap-3">
+                <div className="shrink-0">
+                  <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-red-800 dark:text-red-200 font-medium">
+                    Notifikasi diblokir
+                  </p>
+                  <p className="text-xs text-red-600 dark:text-red-300 mt-0.5">
+                    Aktifkan notifikasi di pengaturan browser untuk mendapat pengingat ibadah
+                  </p>
+                </div>
+                <button
+                  onClick={handleRequestNotification}
+                  className="px-3 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Coba aktifkan lagi
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Header */}
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 mb-6">
             <div className="flex items-center justify-between">
@@ -327,12 +509,22 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={handleLogout}
-                className="bg-[#6b6f74] hover:bg-[#55585c] text-white font-medium py-2 px-4 rounded-lg transition-colors"
-              >
-                Logout
-              </button>
+              <div className="flex items-center gap-3">
+                {notificationPermission !== 'granted' && (
+                  <button
+                    onClick={handleRequestNotification}
+                    className="bg-linear-to-r from-[#2f67b2] to-[#6bc6e5] text-white font-semibold py-2 px-4 rounded-lg shadow hover:shadow-md transition-all text-sm"
+                  >
+                    Aktifkan Notifikasi
+                  </button>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="bg-[#6b6f74] hover:bg-[#55585c] text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
 
