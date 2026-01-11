@@ -8,28 +8,6 @@ const handler = NextAuth({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        // Validasi dengan data hardcoded
-        if (
-          credentials?.email === "galihkur@gmail.com" &&
-          credentials?.password === "admin1234"
-        ) {
-          return {
-            id: "1",
-            name: "Galih Kur",
-            email: "galihkur@gmail.com",
-          };
-        }
-        // Return null jika kredensial tidak valid
-        return null;
-      },
-    }),
   ],
   session: {
     maxAge: 24 * 60 * 60, // 24 hours
@@ -41,11 +19,28 @@ const handler = NextAuth({
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      // Allows callback URLs on the same origin
-      else if (new URL(url).origin === baseUrl) return url;
-      return baseUrl;
+      // Jika URL adalah baseUrl (root), redirect ke dashboard
+      if (url === baseUrl || url === `${baseUrl}/`) {
+        return `${baseUrl}/dashboard`;
+      }
+      // Jika callback URL adalah dashboard, gunakan itu
+      if (url === `${baseUrl}/dashboard`) {
+        return url;
+      }
+      // Untuk relative URLs
+      if (url.startsWith('/')) {
+        // Jika relative URL adalah root, redirect ke dashboard
+        if (url === '/') {
+          return `${baseUrl}/dashboard`;
+        }
+        return `${baseUrl}${url}`;
+      }
+      // Untuk absolute URLs dengan same origin
+      if (new URL(url).origin === baseUrl) {
+        return url;
+      }
+      // Default ke dashboard
+      return `${baseUrl}/dashboard`;
     },
     async session({ session, token }) {
       if (session.user) {

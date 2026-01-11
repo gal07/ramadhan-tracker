@@ -5,55 +5,27 @@ import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [status, setStatus] = useState<'loading' | 'authenticated' | 'unauthenticated'>('loading');
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
-  console.log('Session data:', session);
+  
   // Check session status dan handle redirect
   useEffect(() => {
-    if (session) {
-      router.push('/dashboard');
-    } else {
-      setStatus('unauthenticated');
+    if (status === 'authenticated' && session) {
+      router.replace('/dashboard');
     }
-  }, [session, router]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError('Email atau password salah!');
-      } else if (result?.ok) {
-        router.push('/dashboard');
-      }
-    } catch (error) {
-      console.error('Error signing in:', error);
-      setError('Terjadi kesalahan saat login');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [session, status, router]);
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
-      await signIn('google', { callbackUrl: '/dashboard' });
+      // signIn akan auto redirect setelah berhasil
+      await signIn('google', { 
+        callbackUrl: '/dashboard',
+        redirect: true 
+      });
     } catch (error) {
       console.error('Error signing in with Google:', error);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -89,103 +61,12 @@ export default function LoginPage() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-[#2f67b2] to-[#6bc6e5] dark:from-[#6bc6e5] dark:to-[#2f67b2] bg-clip-text text-transparent mb-2">
               Selamat Datang
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-gray-600 dark:text-gray-400 mb-8">
               Ramadhan Tracker - Catat Ibadahmu
             </p>
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-sm text-red-600 dark:text-red-400 text-center">
-                {error}
-              </p>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Input */}
-            <div>
-              <label 
-                htmlFor="email" 
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2f67b2] focus:border-transparent dark:bg-gray-700 dark:text-white transition-all"
-                placeholder="nama@email.com"
-              />
-            </div>
-
-            {/* Password Input */}
-            <div>
-              <label 
-                htmlFor="password" 
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-[#2f67b2] focus:border-transparent dark:bg-gray-700 dark:text-white transition-all"
-                placeholder="••••••••"
-              />
-            </div>
-
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  id="remember"
-                  type="checkbox"
-                  className="h-4 w-4 text-[#2f67b2] focus:ring-[#2f67b2] border-gray-300 rounded"
-                />
-                <label 
-                  htmlFor="remember" 
-                  className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
-                >
-                  Ingat saya
-                </label>
-              </div>
-              <a 
-                href="#" 
-                className="text-sm text-[#2f67b2] hover:text-[#1f4f91] dark:text-[#6bc6e5] dark:hover:text-[#2f67b2]"
-              >
-                Lupa password?
-              </a>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-[#2f67b2] hover:bg-[#1f4f91] disabled:bg-[#2f67b2]/50 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg"
-            >
-              {isLoading ? 'Memproses...' : 'Masuk'}
-            </button>
-          </form>
-
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">
-                Atau lanjutkan dengan
-              </span>
-            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Silakan login menggunakan akun Google Anda
+            </p>
           </div>
 
           {/* Google Sign In Button */}
@@ -219,19 +100,6 @@ export default function LoginPage() {
             </svg>
             {isLoading ? 'Memproses...' : 'Masuk dengan Google'}
           </button>
-
-          {/* Sign Up Link */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Belum punya akun?{' '}
-              <a 
-                href="#" 
-                className="text-[#2f67b2] hover:text-[#1f4f91] dark:text-[#6bc6e5] dark:hover:text-[#2f67b2] font-medium"
-              >
-                Daftar sekarang
-              </a>
-            </p>
-          </div>
         </div>
       </div>
     </div>
