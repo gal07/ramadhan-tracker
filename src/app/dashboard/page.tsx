@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import SendNotificationButton from '@/app/components/SendNotificationButton';
 import StatisticsSection from './StatisticsSection';
 
@@ -59,6 +60,41 @@ export default function DashboardPage() {
       }
     }
   }, []);
+
+  // Listen untuk foreground FCM messages (saat app terbuka)
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    if (typeof window === 'undefined') return;
+    if (notificationPermission !== 'granted') return;
+
+    const messaging = getMessaging();
+
+    // Handle messages saat app terbuka (foreground)
+    const unsubscribe = onMessage(messaging, (payload) => {
+      console.log('📬 Foreground message received:', payload);
+
+      const title = payload.notification?.title || 'Ramadhan Tracker';
+      const body = payload.notification?.body || 'Ada notifikasi baru';
+      const icon = payload.notification?.icon || '/icon-192x192.png';
+
+      // Tampilkan notifikasi via service worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(title, {
+            body,
+            icon,
+            badge: '/icon-192x192.png',
+            tag: 'ramadhan-notification',
+            requireInteraction: false,
+            data: payload.data,
+            vibrate: [200, 100, 200],
+          } as NotificationOptions & { vibrate: number[] });
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [status, notificationPermission]);
 
   // PWA installation detection
   useEffect(() => {
@@ -180,6 +216,9 @@ export default function DashboardPage() {
         setShowNotificationBanner(false);
         await showNotificationPreview();
         setNotificationRequestStatus({ type: 'success', message: 'Notifikasi berhasil diaktifkan.' });
+        
+        // Simpan FCM Token setelah permission granted
+        await saveFCMToken();
         return;
       }
 
@@ -194,6 +233,59 @@ export default function DashboardPage() {
       console.error('Error requesting notification permission:', error);
       setNotificationRequestStatus({ type: 'error', message: 'Gagal meminta izin notifikasi. Coba lagi.' });
       alert('Gagal meminta izin notifikasi. Coba lagi.');
+    }
+  };
+
+  // Fungsi untuk menyimpan FCM token ke Firestore
+  const saveFCMToken = async () => {
+    try {
+      if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+        console.log('Service worker not supported');
+        return;
+      }
+      if (!session?.user?.email) {
+        console.log('User not authenticated');
+        return;
+      }
+
+      // Tunggu service worker ready
+      const registration = await navigator.serviceWorker.ready;
+      
+      const messaging = getMessaging();
+      
+      // Dapatkan FCM token dengan VAPID key
+      // ⚠️ PENTING: Ganti dengan VAPID key dari Firebase Console
+      // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
+      const token = await getToken(messaging, {
+        vapidKey: 'BKqB9YourVapidKeyHere', // ⚠️ GANTI INI dengan VAPID key Anda!
+        serviceWorkerRegistration: registration,
+      });
+
+      if (token) {
+        console.log('✅ FCM Token obtained:', token);
+        
+        // Simpan token ke Firestore
+        const userEmail = session.user.email;
+        await setDoc(
+          doc(db, 'users', userEmail),
+          {
+            fcmToken: token,
+            fcmTokenUpdatedAt: serverTimestamp(),
+            deviceInfo: {
+              userAgent: navigator.userAgent,
+              platform: navigator.platform,
+              language: navigator.language,
+            },
+          },
+          { merge: true }
+        );
+        
+        console.log('✅ FCM token saved to Firestore for:', userEmail);
+      } else {
+        console.warn('⚠️ No FCM token available. Check VAPID key and service worker.');
+      }
+    } catch (error) {
+      console.error('❌ Error saving FCM token:', error);
     }
   };
 
