@@ -30,6 +30,11 @@ export default function DashboardPage() {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [showNotificationBanner, setShowNotificationBanner] = useState(false);
   const [notificationRequestStatus, setNotificationRequestStatus] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null);
+  
+  // PWA installation states
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   // Jika tidak authenticated, paksa ke halaman login
   useEffect(() => {
@@ -52,6 +57,55 @@ export default function DashboardPage() {
           setShowNotificationBanner(true);
         }, 2000);
       }
+    }
+  }, []);
+
+  // PWA installation detection
+  useEffect(() => {
+    // Cek apakah sudah running di standalone mode (sudah diinstall)
+    const checkInstalled = () => {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                          (window.navigator as any).standalone === true || // iOS Safari
+                          document.referrer.includes('android-app://'); // Android TWA
+      setIsAppInstalled(isStandalone);
+      return isStandalone;
+    };
+
+    const installed = checkInstalled();
+
+    // Jika belum diinstall, setup event listeners
+    if (!installed) {
+      // Listen untuk beforeinstallprompt (PWA belum diinstall dan bisa diinstall)
+      const handleBeforeInstall = (e: Event) => {
+        e.preventDefault();
+        setDeferredPrompt(e);
+        setIsAppInstalled(false);
+        
+        // Check if install banner was dismissed before
+        const installDismissed = localStorage.getItem('install-banner-dismissed');
+        if (installDismissed !== 'true') {
+          setTimeout(() => {
+            setShowInstallBanner(true);
+          }, 3000); // Show after 3 seconds
+        }
+      };
+
+      // Listen untuk appinstalled (PWA baru saja diinstall)
+      const handleAppInstalled = () => {
+        setIsAppInstalled(true);
+        setDeferredPrompt(null);
+        setShowInstallBanner(false);
+        localStorage.removeItem('install-banner-dismissed');
+        console.log('PWA was installed successfully');
+      };
+
+      window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.addEventListener('appinstalled', handleAppInstalled);
+
+      return () => {
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+        window.removeEventListener('appinstalled', handleAppInstalled);
+      };
     }
   }, []);
 
@@ -146,6 +200,39 @@ export default function DashboardPage() {
   const handleDismissNotificationBanner = () => {
     setShowNotificationBanner(false);
     localStorage.setItem('notification-banner-dismissed', 'true');
+  };
+
+  // Handle PWA install prompt
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      console.log('Install prompt not available');
+      return;
+    }
+
+    try {
+      // Show the install prompt
+      deferredPrompt.prompt();
+      
+      // Wait for the user's response
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        console.log('User accepted the install prompt');
+        setShowInstallBanner(false);
+      } else {
+        console.log('User dismissed the install prompt');
+      }
+      
+      // Clear the deferredPrompt
+      setDeferredPrompt(null);
+    } catch (error) {
+      console.error('Error showing install prompt:', error);
+    }
+  };
+
+  const handleDismissInstallBanner = () => {
+    setShowInstallBanner(false);
+    localStorage.setItem('install-banner-dismissed', 'true');
   };
 
   // Load activities from Firestore
@@ -422,6 +509,43 @@ export default function DashboardPage() {
             >
               <span className="text-base">🔔</span>
               <span>{notificationRequestStatus.message}</span>
+            </div>
+          )}
+
+          {/* Install PWA Banner */}
+          {!isAppInstalled && showInstallBanner && deferredPrompt && (
+            <div className="mb-6">
+              <div className="bg-linear-to-r from-[#6bc6e5] to-[#2f67b2] rounded-2xl shadow-xl p-4 flex items-center gap-4">
+                <div className="shrink-0">
+                  <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-white font-semibold text-sm mb-1">
+                    📲 Install Aplikasi
+                  </h3>
+                  <p className="text-white/90 text-xs">
+                    Install aplikasi ke homescreen untuk akses lebih cepat dan pengalaman lebih baik
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleInstallClick}
+                    className="px-4 py-2 bg-white text-[#2f67b2] rounded-lg font-medium text-sm hover:bg-white/90 transition-colors shadow-lg"
+                  >
+                    Install
+                  </button>
+                  <button
+                    onClick={handleDismissInstallBanner}
+                    className="p-2 text-white hover:bg-white/20 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
