@@ -28,6 +28,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   'Waktu Tidur': '#9bddef',
 };
 
+const WEEKDAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
 export default function StatisticsSection() {
   const { data: session } = useSession();
   const [loading, setLoading] = useState(true);
@@ -36,8 +38,12 @@ export default function StatisticsSection() {
   const [overallStats, setOverallStats] = useState({ total: 0, completed: 0, pending: 0 });
   const [topActivities, setTopActivities] = useState<Array<{ name: string; count: number; category: string }>>([]);
   const [bestCategory, setBestCategory] = useState<{ name: string; rate: number } | null>(null);
+  const [weakestCategory, setWeakestCategory] = useState<{ name: string; rate: number } | null>(null);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [perfectDays, setPerfectDays] = useState(0);
+  const [bestDayOfWeek, setBestDayOfWeek] = useState<{ name: string; rate: number; total: number } | null>(null);
+  const [recentCompletionRate, setRecentCompletionRate] = useState(0);
+  const [momentumChange, setMomentumChange] = useState(0);
 
   useEffect(() => {
     const loadStatistics = async () => {
@@ -111,6 +117,48 @@ export default function StatisticsSection() {
           }))
           .sort((a, b) => b.rate - a.rate);
         setBestCategory(categoryRates[0] || null);
+        setWeakestCategory(categoryRates[categoryRates.length - 1] || null);
+
+        // Hitung hari paling produktif (berdasarkan completion rate per hari dalam seminggu)
+        const weekdayStats = Array.from({ length: 7 }, () => ({ completed: 0, total: 0 }));
+        logs.forEach((log) => {
+          const dayIdx = new Date(log.date).getDay();
+          Object.values(log.activities).forEach((activity) => {
+            weekdayStats[dayIdx].total += 1;
+            if (activity.status === 'completed') {
+              weekdayStats[dayIdx].completed += 1;
+            }
+          });
+        });
+        const weekdayRates = weekdayStats.map((stat, idx) => ({
+          name: WEEKDAY_NAMES[idx],
+          total: stat.total,
+          rate: stat.total > 0 ? Math.round((stat.completed / stat.total) * 100) : 0,
+        }));
+        const productiveDay = weekdayRates
+          .filter((w) => w.total > 0)
+          .sort((a, b) => b.rate - a.rate)[0] || null;
+        setBestDayOfWeek(productiveDay);
+
+        // Momentum 7 hari terakhir vs 7 hari sebelumnya
+        const sortedLogsFull = logs.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const computeRate = (items: DailyLog[]) => {
+          let completed = 0;
+          let total = 0;
+          items.forEach((log) => {
+            Object.values(log.activities).forEach((act) => {
+              total++;
+              if (act.status === 'completed') completed++;
+            });
+          });
+          return total > 0 ? Math.round((completed / total) * 100) : 0;
+        };
+        const recentLogs = sortedLogsFull.slice(0, 7);
+        const previousLogs = sortedLogsFull.slice(7, 14);
+        const recentRate = computeRate(recentLogs);
+        const previousRate = computeRate(previousLogs);
+        setRecentCompletionRate(recentRate);
+        setMomentumChange(recentRate - previousRate);
 
         // Hitung streak (hari berturut-turut dengan aktivitas completed)
         const sortedLogs = logs
@@ -209,9 +257,9 @@ export default function StatisticsSection() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto">
       {/* Overall Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white rounded-xl p-6 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
@@ -455,7 +503,7 @@ export default function StatisticsSection() {
             Ringkasan
           </h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="bg-linear-to-br from-[#2f67b2]/10 to-[#2f67b2]/20 dark:from-[#2f67b2]/20 dark:to-[#2f67b2]/30 rounded-lg p-4 border border-[#2f67b2]/30 dark:border-[#2f67b2]/50">
             <div className="flex items-center gap-2 mb-1">
               <svg className="w-4 h-4 text-[#2f67b2] dark:text-[#6bc6e5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -606,6 +654,39 @@ export default function StatisticsSection() {
                 {perfectDays > 0 ? '⭐ 100% aktivitas diselesaikan!' : '🎯 Capai hari sempurna pertama!'}
               </p>
             </div>
+          </div>
+        </div>
+
+        {/* Insight Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white rounded-xl p-5 shadow-lg">
+            <p className="text-xs font-semibold text-white/80">Hari Paling Produktif</p>
+            <p className="text-2xl font-bold mt-1">{bestDayOfWeek?.name || '-'}</p>
+            <p className="text-sm text-white/80">{bestDayOfWeek ? `${bestDayOfWeek.rate}% completion (${bestDayOfWeek.total} aktivitas)` : 'Belum ada data'}</p>
+          </div>
+
+          <div className="bg-linear-to-br from-green-500 to-emerald-600 text-white rounded-xl p-5 shadow-lg">
+            <p className="text-xs font-semibold text-white/80">Momentum 7 Hari</p>
+            <p className="text-2xl font-bold mt-1 flex items-center gap-2">
+              <span className={`${momentumChange >= 0 ? 'text-white' : 'text-white'}`}>{momentumChange >= 0 ? '▲' : '▼'}</span>
+              {Math.abs(momentumChange)}%
+            </p>
+            <p className="text-sm text-white/80">vs minggu lalu · completion {recentCompletionRate}%</p>
+          </div>
+
+          <div className="bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white rounded-xl p-5 shadow-lg">
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-9 h-9 bg-white/15 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-white/80">Perlu Perhatian</p>
+                <p className="text-2xl font-bold">{weakestCategory?.name || '-'}</p>
+              </div>
+            </div>
+            <p className="text-sm text-white/80">Completion rate: {weakestCategory ? `${weakestCategory.rate}%` : 'Belum ada data'}</p>
           </div>
         </div>
       </div>
