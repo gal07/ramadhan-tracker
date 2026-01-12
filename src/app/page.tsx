@@ -98,7 +98,7 @@ export default function LoginPage() {
                 style={{ fill: '#EA4335' }}
               />
             </svg>
-            {isLoading ? 'Memproses...' : 'Masuk dengan Google'}
+            {isLoading ? 'Memproses....' : 'Masuk dengan Google'}
           </button>
         </div>
       </div>
