@@ -26,7 +26,7 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification?.title || 'Ramadhan Tracker';
   const notificationOptions = {
     body: payload.notification?.body || 'Ada notifikasi baru',
-    icon: payload.notification?.icon || '/ybm_logo.png',
+    icon: payload.notification?.icon || '/icon512_maskable.png',
     badge: payload.notification?.icon || '/ybm_logo.png',
     vibrate: [200, 100, 200],
     tag: 'ramadhan-notification',

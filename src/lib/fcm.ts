@@ -76,7 +76,7 @@ export function setupForegroundNotifications(): void {
       const notificationTitle = payload.notification?.title || 'Notification';
       const notificationOptions: NotificationOptions = {
         body: payload.notification?.body || '',
-        icon: '/ybm_logo.png',
+        icon: '/icon512_maskable.png',
         badge: '/ybm_logo.png',
       };
 

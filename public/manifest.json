@@ -1,21 +1,28 @@
 {
-  "name": "Ramadhan Tracker",
-  "short_name": "Ramadhan",
+  "name": "Ramadhan Tracker By YBM BRILian",
+  "short_name": "Ramadhan Tracker",
   "description": "Aplikasi untuk mencatat dan melacak ibadah selama bulan Ramadhan",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#9333ea",
   "orientation": "portrait",
+  "splash_screens": [
+    {
+      "src": "/icon512_maskable.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
   "icons": [
     {
-      "src": "/ybm_logo.png",
+      "src": "/icon512_maskable.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/ybm_logo.png",
+      "src": "/icon512_rounded.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -34,7 +41,7 @@
       "url": "/calendar",
       "icons": [
         {
-          "src": "/ybm_logo.png",
+          "src": "/icon512_maskable.png",
           "sizes": "192x192"
         }
       ]
@@ -46,7 +53,31 @@
       "url": "/dashboard",
       "icons": [
         {
-          "src": "/ybm_logo.png",
+          "src": "/icon512_maskable.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Quran",
+      "short_name": "Quran",
+      "description": "Buka Quran",
+      "url": "/quran",
+      "icons": [
+        {
+          "src": "/icon512_maskable.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Doa",
+      "short_name": "Doa",
+      "description": "Buka Doa Harian",
+      "url": "/doa",
+      "icons": [
+        {
+          "src": "/icon512_maskable.png",
           "sizes": "192x192"
         }
       ]

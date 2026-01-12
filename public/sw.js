@@ -3,7 +3,7 @@ const CACHE_NAME = 'ramadhan-tracker-v1';
 const urlsToCache = [
   '/',
   '/manifest.json',
-  '/ybm_logo.png',
+  '/icon512_maskable.png',
   '/favicon.ico',
 ];
 
@@ -40,7 +40,7 @@ try {
       const notificationTitle = payload.notification?.title || 'Notification';
       const notificationOptions = {
         body: payload.notification?.body || '',
-        icon: '/ybm_logo.png',
+        icon: '/icon512_maskable.png',
         badge: '/ybm_logo.png',
       };
       self.registration.showNotification(notificationTitle, notificationOptions);
