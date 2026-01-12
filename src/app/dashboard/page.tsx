@@ -831,6 +831,60 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </button>
+
+                  <button
+                    onClick={() => router.push('/doa')}
+                    className="p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gray-300 dark:bg-gray-600">
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-sm">🤲 Doa-Doa Harian</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Kumpulan doa lengkap</p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => router.push('/quran')}
+                    className="p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gray-300 dark:bg-gray-600">
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 5a2 2 0 012-2h7.5a2 2 0 012 2v13a1 1 0 01-1.447.894L10 17.118l-4.053 1.776A1 1 0 014 18V5zm15 0a2 2 0 00-2-2h-.5a.5.5 0 00-.5.5V5"
+                          />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-sm">📖 Baca Qur'an</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Mushaf ringan & cepat</p>
+                      </div>
+                    </div>
+                  </button>
               </div>
             </div>
 
