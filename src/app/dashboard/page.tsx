@@ -236,15 +236,15 @@ export default function DashboardPage() {
     }
   };
 
-  // Fungsi untuk menyimpan FCM token ke Firestore
+  // Fungsi untuk menyimpan FCM token ke Firestore (untuk tracking manual, tidak wajib)
   const saveFCMToken = async () => {
     try {
       if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-        console.log('Service worker not supported');
+        console.log('⚠️ Service worker not supported');
         return;
       }
       if (!session?.user?.email) {
-        console.log('User not authenticated');
+        console.log('⚠️ User not authenticated');
         return;
       }
 
@@ -257,14 +257,18 @@ export default function DashboardPage() {
       // ⚠️ PENTING: Ganti dengan VAPID key dari Firebase Console
       // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
       const token = await getToken(messaging, {
-        vapidKey: 'BKqB9YourVapidKeyHere', // ⚠️ GANTI INI dengan VAPID key Anda!
+        // ambil vapid dari environment variable atau hardcode di sini
+        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || '', // ⚠️ GANTI INI dengan VAPID key Anda!
         serviceWorkerRegistration: registration,
+      }).catch((error) => {
+        console.warn('⚠️ getToken error - VAPID key mungkin belum diset:', error.message);
+        return null;
       });
 
       if (token) {
         console.log('✅ FCM Token obtained:', token);
         
-        // Simpan token ke Firestore
+        // Simpan token ke Firestore untuk tracking (opsional)
         const userEmail = session.user.email;
         await setDoc(
           doc(db, 'users', userEmail),
@@ -282,10 +286,11 @@ export default function DashboardPage() {
         
         console.log('✅ FCM token saved to Firestore for:', userEmail);
       } else {
-        console.warn('⚠️ No FCM token available. Check VAPID key and service worker.');
+        console.warn('⚠️ No FCM token available. Service worker masih belum fully registered, atau VAPID key belum diset.');
+        console.warn('ℹ️ Campaign FCM masih bisa diterima via service worker background message, meskipun getToken gagal.');
       }
     } catch (error) {
-      console.error('❌ Error saving FCM token:', error);
+      console.error('❌ Error in saveFCMToken:', error);
     }
   };
 
