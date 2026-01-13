@@ -9,6 +9,7 @@ import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, setDoc } fro
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import SendNotificationButton from '@/app/components/SendNotificationButton';
 import StatisticsSection from './StatisticsSection';
+import PrayerScheduleCard from '@/app/components/PrayerScheduleCard';
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
@@ -738,6 +739,11 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
+          </div>
+
+          {/* Prayer Schedule Card */}
+          <div className="mb-6">
+            <PrayerScheduleCard />
           </div>
 
           {/* Content */}
