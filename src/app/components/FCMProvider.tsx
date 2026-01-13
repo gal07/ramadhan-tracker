@@ -10,7 +10,12 @@ export function FCMProvider() {
   useEffect(() => {
     // Only setup FCM if user is authenticated
     const email = session?.user?.email;
-    if (!email) return;
+    if (!email) {
+      console.log('[FCM Provider] Waiting for user session...');
+      return;
+    }
+
+    console.log('[FCM Provider] Setting up FCM for user:', email);
 
     const setupFCM = async () => {
       try {
@@ -18,14 +23,20 @@ export function FCMProvider() {
         const token = await requestNotificationPermission();
 
         if (token) {
+          console.log('[FCM Provider] ✅ FCM token obtained, saving to database...');
+          
           // Save token to database
           await saveFCMTokenToDatabase(email, token);
           
           // Setup foreground notification listener
           setupForegroundNotifications();
+          
+          console.log('[FCM Provider] ✅ FCM setup complete');
+        } else {
+          console.warn('[FCM Provider] ⚠️ Failed to obtain FCM token');
         }
       } catch (error) {
-        console.error('FCM setup failed:', error);
+        console.error('[FCM Provider] ❌ FCM setup failed:', error);
       }
     };
 

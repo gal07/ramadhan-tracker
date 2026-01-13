@@ -26,39 +26,47 @@ export async function requestNotificationPermission(): Promise<string | null> {
   try {
     // Check if notifications are supported
     if (!('Notification' in window)) {
-      console.log('This browser does not support notifications');
+      console.log('[FCM] This browser does not support notifications');
       return null;
     }
 
     // Request permission if not already granted
     if (Notification.permission === 'denied') {
-      console.log('Notification permission denied');
+      console.log('[FCM] Notification permission denied');
       return null;
     }
 
     if (Notification.permission !== 'granted') {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        console.log('Notification permission not granted');
+        console.log('[FCM] Notification permission not granted');
         return null;
       }
     }
 
-    // Get FCM token
+    // Check VAPID key
     if (!process.env.NEXT_PUBLIC_FCM_VAPID_KEY) {
-      console.warn('FCM VAPID key not configured');
+      console.error('[FCM] VAPID key not configured in environment variables!');
       return null;
     }
 
+    // CRITICAL: Wait for service worker to be ready before getting token
+    console.log('[FCM] Waiting for service worker...');
+    const registration = await navigator.serviceWorker.ready;
+    console.log('[FCM] Service worker ready:', registration.scope);
+
     const messaging = getMessaging(app);
+    
+    // Get token with explicit service worker registration
     const token = await getToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_FCM_VAPID_KEY,
+      serviceWorkerRegistration: registration,
     });
 
-    console.log('FCM Token obtained:', token);
+    console.log('[FCM] ✅ Token obtained:', token?.substring(0, 20) + '...');
     return token;
   } catch (error) {
-    console.error('Failed to get FCM token:', error);
+    console.error('[FCM] Failed to get FCM token:', error);
     return null;
   }
 }
@@ -71,24 +79,29 @@ export function setupForegroundNotifications(): void {
     const messaging = getMessaging(app);
 
     onMessage(messaging, (payload) => {
-      console.log('Foreground message received:', payload);
+      console.log('[FCM] Foreground message received:', payload);
 
-      const notificationTitle = payload.notification?.title || 'Notification';
+      const notificationTitle = payload.notification?.title || 'Ramadhan Tracker';
       const notificationOptions: NotificationOptions = {
-        body: payload.notification?.body || '',
-        icon: '/icon512_maskable.png',
+        body: payload.notification?.body || 'Ada notifikasi baru',
+        icon: payload.notification?.icon || '/icon512_maskable.png',
         badge: '/ybm_logo.png',
+        tag: 'ramadhan-notification',
+        data: payload.data,
       };
 
-      // Show notification in foreground
+      // Show notification via service worker
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then((registration) => {
+          console.log('[FCM] Showing foreground notification via service worker');
           registration.showNotification(notificationTitle, notificationOptions);
         });
       }
     });
+    
+    console.log('[FCM] Foreground notifications setup complete');
   } catch (error) {
-    console.error('Failed to setup foreground notifications:', error);
+    console.error('[FCM] Failed to setup foreground notifications:', error);
   }
 }
 
@@ -110,11 +123,11 @@ export async function saveFCMTokenToDatabase(userId: string, token: string): Pro
     });
 
     if (!response.ok) {
-      throw new Error('Failed to save FCM token');
+      throw new Error(`Failed to save FCM token: ${response.status}`);
     }
 
-    console.log('FCM token saved to database');
+    console.log('[FCM] ✅ Token saved to database');
   } catch (error) {
-    console.error('Failed to save FCM token:', error);
+    console.error('[FCM] Failed to save token to database:', error);
   }
 }
