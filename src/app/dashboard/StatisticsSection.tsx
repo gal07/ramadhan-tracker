@@ -44,6 +44,7 @@ export default function StatisticsSection() {
   const [bestDayOfWeek, setBestDayOfWeek] = useState<{ name: string; rate: number; total: number } | null>(null);
   const [recentCompletionRate, setRecentCompletionRate] = useState(0);
   const [momentumChange, setMomentumChange] = useState(0);
+  const [completedSurahsCount, setCompletedSurahsCount] = useState(0);
 
   useEffect(() => {
     const loadStatistics = async () => {
@@ -51,8 +52,14 @@ export default function StatisticsSection() {
 
       setLoading(true);
       try {
+        // Load daily logs
         const logsRef = collection(db, 'users', session.user.email, 'daily_logs');
         const snapshot = await getDocs(logsRef);
+        
+        // Load completed surahs count
+        const surahRef = collection(db, 'users', session.user.email, 'surah_completed');
+        const surahSnapshot = await getDocs(surahRef);
+        setCompletedSurahsCount(surahSnapshot.size);
         
         const logs: DailyLog[] = [];
         snapshot.forEach((doc) => {
@@ -299,6 +306,116 @@ export default function StatisticsSection() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
+          </div>
+        </div>
+      </div>
+
+      
+      {/* Menuju Khatam Quran Card */}
+      <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl p-6 shadow-lg border-t-4 border-green-500">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-10 h-10 bg-green-500/20 dark:bg-green-500/30 rounded-lg flex items-center justify-center">
+            <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-green-900 dark:text-green-100">
+            Menuju Khatam Quran
+          </h3>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-sm text-green-700 dark:text-green-300 mb-1">Surah yang Sudah Dibaca</p>
+              <p className="text-4xl font-bold text-green-600 dark:text-green-400">
+                {completedSurahsCount}
+                <span className="text-lg text-green-500 dark:text-green-500 ml-2">/ 114</span>
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="inline-flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 rounded-lg px-3 py-2">
+                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {Math.round((completedSurahsCount / 114) * 100)}%
+                </span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="relative">
+            <div className="overflow-hidden h-3 text-xs flex rounded-full bg-green-200 dark:bg-green-900/40">
+              <div 
+                style={{ width: `${(completedSurahsCount / 114) * 100}%` }}
+                className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-500"
+              ></div>
+            </div>
+          </div>
+
+          {/* Motivational Message */}
+          <div className="bg-white/60 dark:bg-gray-800/60 rounded-lg p-4 border border-green-200 dark:border-green-700">
+            {completedSurahsCount === 0 && (
+              <div className="text-center">
+                <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-1">
+                  🌟 Mulai Perjalanan Khatam Quran!
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  Baca surah pertamamu dan raih pahala berlimpah. Setiap huruf adalah kebaikan!
+                </p>
+              </div>
+            )}
+            {completedSurahsCount > 0 && completedSurahsCount < 30 && (
+              <div className="text-center">
+                <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-1">
+                  🚀 Luar Biasa! {completedSurahsCount} Surah Telah Selesai
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  Masih {114 - completedSurahsCount} surah lagi menuju khatam. Istiqomah adalah kunci!
+                </p>
+              </div>
+            )}
+            {completedSurahsCount >= 30 && completedSurahsCount < 57 && (
+              <div className="text-center">
+                <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-1">
+                  🔥 Hebat! Sudah Separuh Jalan!
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  {114 - completedSurahsCount} surah tersisa. Allah bersama orang yang sabar dan istiqomah!
+                </p>
+              </div>
+            )}
+            {completedSurahsCount >= 57 && completedSurahsCount < 100 && (
+              <div className="text-center">
+                <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-1">
+                  💪 Luar Biasa! Hampir Sampai!
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  Hanya {114 - completedSurahsCount} surah lagi! Khatam sudah di depan mata. Semangat!
+                </p>
+              </div>
+            )}
+            {completedSurahsCount >= 100 && completedSurahsCount < 114 && (
+              <div className="text-center">
+                <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-1">
+                  🌙 MasyaAllah! Tinggal Sedikit Lagi!
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  {114 - completedSurahsCount} surah lagi khatam Quran! Jangan berhenti sekarang!
+                </p>
+              </div>
+            )}
+            {completedSurahsCount === 114 && (
+              <div className="text-center">
+                <p className="text-sm font-semibold text-green-800 dark:text-green-200 mb-1">
+                  🎉 Alhamdulillah! Khatam Quran!
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  Selamat! Semoga Allah terima dan berkahi bacaanmu. Mulai lagi dari awal? 💚
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

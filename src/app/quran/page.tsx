@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { db } from "@/lib/firebase";
+import { doc, setDoc, serverTimestamp, collection, getDocs, deleteDoc } from "firebase/firestore";
 
 interface SurahMeta {
   number: number;
@@ -26,7 +28,7 @@ interface SurahDetail {
 }
 
 export default function QuranPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
 
   const [surahList, setSurahList] = useState<SurahMeta[]>([]);
@@ -38,6 +40,12 @@ export default function QuranPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(20);
+  const [bookmark, setBookmark] = useState<{ surah: number; ayah: number } | null>(null);
+  const [completedSurahs, setCompletedSurahs] = useState<Set<number>>(new Set());
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const toastTimer = useRef<NodeJS.Timeout | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
 
   // Force login redirect
   useEffect(() => {
@@ -45,6 +53,64 @@ export default function QuranPage() {
       router.replace("/");
     }
   }, [status, router]);
+
+  // Load saved bookmark from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("quran-bookmark");
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as { surah: number; ayah: number };
+      if (parsed?.surah && parsed?.ayah) {
+        setBookmark(parsed);
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return () => {
+      if (toastTimer.current) {
+        clearTimeout(toastTimer.current);
+      }
+    };
+  }, []);
+
+  // Track scroll position for scroll-to-top button
+  useEffect(() => {
+    const handleScroll = () => {
+      if (contentRef.current) {
+        const scrollTop = contentRef.current.scrollTop;
+        setShowScrollTop(scrollTop > 300);
+      }
+    };
+
+    const contentElement = contentRef.current;
+    if (contentElement) {
+      contentElement.addEventListener('scroll', handleScroll);
+      return () => contentElement.removeEventListener('scroll', handleScroll);
+    }
+  }, [selectedSurah]);
+
+  // Load completed surahs from Firestore
+  useEffect(() => {
+    const email = session?.user?.email;
+    if (!email) return;
+
+    const loadCompleted = async () => {
+      try {
+        const colRef = collection(db, "users", email, "surah_completed");
+        const snapshot = await getDocs(colRef);
+        const completed = new Set<number>();
+        snapshot.forEach((doc) => {
+          const surahNumber = parseInt(doc.id);
+          if (!isNaN(surahNumber)) completed.add(surahNumber);
+        });
+        setCompletedSurahs(completed);
+      } catch (error) {
+        console.error("Failed to load completed surahs:", error);
+      }
+    };
+
+    loadCompleted();
+  }, [session?.user?.email]);
 
   // Fetch surah metadata once (lightweight)
   useEffect(() => {
@@ -106,6 +172,90 @@ export default function QuranPage() {
     }
   };
 
+  const showToast = (message: string, type: "success" | "error") => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, type });
+    toastTimer.current = setTimeout(() => setToast(null), 2500);
+  };
+
+  const saveBookmark = async (surah: number, ayah: number) => {
+    const data = { surah, ayah };
+    setBookmark(data);
+    localStorage.setItem("quran-bookmark", JSON.stringify(data));
+
+    // Persist to Firestore if user is logged in
+    const email = session?.user?.email;
+    if (email) {
+      try {
+        const ref = doc(db, "users", email, "last_read", "bookmark");
+        await setDoc(ref, {
+          surah,
+          ayah,
+          updatedAt: serverTimestamp(),
+        });
+        showToast("Tersimpan ke akun Anda", "success");
+        return;
+      } catch (error) {
+        showToast("Gagal menyimpan ke cloud, disimpan lokal", "error");
+        return;
+      }
+    }
+
+    showToast("Tersimpan di perangkat", "success");
+  };
+
+  const goToBookmark = async () => {
+    if (!bookmark) return;
+    await loadSurahDetail(bookmark.surah);
+    setVisibleCount(Math.max(20, bookmark.ayah + 5));
+    setTimeout(() => {
+      const el = document.getElementById(`ayah-${bookmark.ayah}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 200);
+  };
+
+  const markSurahCompleted = async (surahNumber: number) => {
+    const email = session?.user?.email;
+    if (!email) {
+      showToast("Silakan login untuk menyimpan", "error");
+      return;
+    }
+
+    const isCompleted = completedSurahs.has(surahNumber);
+
+    try {
+      const ref = doc(db, "users", email, "surah_completed", String(surahNumber));
+      
+      if (isCompleted) {
+        // Remove from database
+        await deleteDoc(ref);
+        setCompletedSurahs((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(surahNumber);
+          return newSet;
+        });
+        showToast("Tanda selesai dibaca dibatalkan", "success");
+      } else {
+        // Add to database
+        await setDoc(ref, {
+          surahNumber,
+          completedAt: serverTimestamp(),
+        });
+        setCompletedSurahs((prev) => new Set(prev).add(surahNumber));
+        showToast("Surah ditandai selesai dibaca", "success");
+      }
+    } catch (error) {
+      console.error("Failed to toggle surah completion:", error);
+      showToast("Gagal menyimpan, coba lagi", "error");
+    }
+  };
+
+  const scrollToTop = () => {
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const renderVerses = () => {
     if (!selectedSurah) return null;
     const verses = selectedSurah.verses.slice(0, visibleCount);
@@ -115,6 +265,7 @@ export default function QuranPage() {
         {verses.map((v) => (
           <div
             key={v.number.inSurah}
+            id={`ayah-${v.number.inSurah}`}
             className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white/70 dark:bg-gray-800/60 p-4 shadow-sm"
           >
             <div className="flex items-start justify-between gap-3">
@@ -123,6 +274,15 @@ export default function QuranPage() {
             </div>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300 italic">{v.text.transliteration.en}</p>
             <p className="mt-1 text-sm text-gray-700 dark:text-gray-200">{v.translation.id}</p>
+
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={() => selectedSurah && saveBookmark(selectedSurah.number, v.number.inSurah)}
+                className="text-xs px-3 py-1 rounded-lg border border-[#1f4f91]/30 text-[#1f4f91] dark:text-[#6bc6e5] hover:bg-[#1f4f91]/10 dark:hover:bg-[#1f4f91]/20"
+              >
+                Tandai terakhir dibaca
+              </button>
+            </div>
           </div>
         ))}
 
@@ -177,19 +337,27 @@ export default function QuranPage() {
             <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
               {filteredSurah.map((surah) => {
                 const isActive = surah.number === selectedSurah?.number;
+                const isCompleted = completedSurahs.has(surah.number);
                 return (
                   <button
                     key={surah.number}
                     onClick={() => loadSurahDetail(surah.number)}
-                    className={`w-full text-left p-3 rounded-xl transition-colors border ${
+                    className={`w-full text-left p-3 rounded-xl transition-colors border relative ${
                       isActive
                         ? "border-[#1f4f91] bg-[#e8f1fb] dark:bg-[#1f4f91]/20 text-[#1f4f91] dark:text-[#6bc6e5]"
                         : "border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 hover:border-[#1f4f91]/50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold">{surah.number}. {surah.name.transliteration.id}</p>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold flex items-center gap-2">
+                          {surah.number}. {surah.name.transliteration.id}
+                          {isCompleted && (
+                            <span className="text-green-600 dark:text-green-400" title="Selesai dibaca">
+                              ✓
+                            </span>
+                          )}
+                        </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">{surah.name.translation.id} • {surah.revelation.id}</p>
                       </div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">{surah.numberOfVerses} ayat</span>
@@ -201,7 +369,69 @@ export default function QuranPage() {
           </div>
 
           {/* Content */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 min-h-[60vh]">
+          <div 
+            ref={contentRef}
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 min-h-[60vh] max-h-[85vh] overflow-y-auto relative"
+          >
+            {/* Toast */}
+            {toast && (
+              <div
+                className={`fixed right-6 top-6 z-50 rounded-lg px-4 py-3 text-sm shadow-lg border backdrop-blur-sm
+                ${toast.type === "success" ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/40 dark:border-green-700 dark:text-green-100" : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/40 dark:border-red-700 dark:text-red-100"}`}
+              >
+                {toast.message}
+              </div>
+            )}
+
+            {/* Scroll to Top Button */}
+            {showScrollTop && (
+              <button
+                onClick={scrollToTop}
+                className="fixed bottom-8 right-8 z-40 bg-[#1f4f91] hover:bg-[#2f67b2] text-white p-3 rounded-full shadow-lg transition-all duration-300 hover:scale-110 active:scale-95"
+                title="Kembali ke atas"
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="h-6 w-6" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M5 10l7-7m0 0l7 7m-7-7v18" 
+                  />
+                </svg>
+              </button>
+            )}
+
+            <div className="flex items-center justify-between mb-4">
+              <div />
+              <div className="flex items-center gap-2">
+                {bookmark && (
+                  <button
+                    onClick={goToBookmark}
+                    className="text-sm px-3 py-1 rounded-lg border border-[#1f4f91]/30 text-[#1f4f91] dark:text-[#6bc6e5] hover:bg-[#1f4f91]/10 dark:hover:bg-[#1f4f91]/20"
+                  >
+                    Lanjutkan terakhir: Surah {bookmark.surah}, Ayat {bookmark.ayah}
+                  </button>
+                )}
+                {selectedSurah && (
+                  <button
+                    onClick={() => markSurahCompleted(selectedSurah.number)}
+                    className={`text-sm px-3 py-1 rounded-lg border transition-colors ${
+                      completedSurahs.has(selectedSurah.number)
+                        ? "border-green-200 bg-green-50 text-green-700 dark:bg-green-900/30 dark:border-green-700 dark:text-green-300 hover:bg-red-50 hover:border-red-200 dark:hover:bg-red-900/30 dark:hover:border-red-700"
+                        : "border-[#1f4f91]/30 text-[#1f4f91] dark:text-[#6bc6e5] hover:bg-[#1f4f91]/10 dark:hover:bg-[#1f4f91]/20"
+                    }`}
+                  >
+                    {completedSurahs.has(selectedSurah.number) ? "✓ Selesai dibaca (klik untuk batal)" : "Tandai selesai dibaca"}
+                  </button>
+                )}
+              </div>
+            </div>
             {!selectedSurah && !detailLoading && (
               <div className="text-center text-gray-600 dark:text-gray-400">
                 Pilih surah untuk mulai membaca.
