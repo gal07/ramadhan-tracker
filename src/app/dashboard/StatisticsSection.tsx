@@ -1,11 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { ResponsiveBar } from '@nivo/bar';
-import { ResponsivePie } from '@nivo/pie';
+import dynamic from 'next/dynamic';
+import React from 'react';
+
+// Lazy load charts for better performance
+const ResponsiveBar = dynamic(
+  () => import('@nivo/bar').then(mod => mod.ResponsiveBar),
+  { ssr: false, loading: () => <div className="w-full h-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg" /> }
+);
+
+const ResponsivePie = dynamic(
+  () => import('@nivo/pie').then(mod => mod.ResponsivePie),
+  { ssr: false, loading: () => <div className="w-full h-64 animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg" /> }
+);
 
 interface DailyLog {
   date: string;
@@ -30,196 +41,298 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const WEEKDAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
-export default function StatisticsSection() {
+// Cache utilities
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const getCacheKey = (email: string, type: 'logs' | 'surahs') => `stats_${type}_${email}`;
+
+const getFromCache = <T,>(key: string): T | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const cached = localStorage.getItem(key);
+    if (!cached) return null;
+    
+    const entry: CacheEntry<T> = JSON.parse(cached);
+    const isExpired = Date.now() - entry.timestamp > CACHE_DURATION;
+    
+    if (isExpired) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    
+    return entry.data;
+  } catch (err) {
+    console.warn('Cache read error:', err);
+    return null;
+  }
+};
+
+const saveToCache = <T,>(key: string, data: T) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const entry: CacheEntry<T> = { data, timestamp: Date.now() };
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch (err) {
+    console.warn('Cache write error:', err);
+  }
+};
+
+function StatisticsSectionContent() {
   const { data: session } = useSession();
   const [loading, setLoading] = useState(true);
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
-  const [categoryStats, setCategoryStats] = useState<Array<{ name: string; completed: number; pending: number }>>([]);
-  const [overallStats, setOverallStats] = useState({ total: 0, completed: 0, pending: 0 });
-  const [topActivities, setTopActivities] = useState<Array<{ name: string; count: number; category: string }>>([]);
-  const [bestCategory, setBestCategory] = useState<{ name: string; rate: number } | null>(null);
-  const [weakestCategory, setWeakestCategory] = useState<{ name: string; rate: number } | null>(null);
-  const [currentStreak, setCurrentStreak] = useState(0);
-  const [perfectDays, setPerfectDays] = useState(0);
-  const [bestDayOfWeek, setBestDayOfWeek] = useState<{ name: string; rate: number; total: number } | null>(null);
-  const [recentCompletionRate, setRecentCompletionRate] = useState(0);
-  const [momentumChange, setMomentumChange] = useState(0);
   const [completedSurahsCount, setCompletedSurahsCount] = useState(0);
 
-  useEffect(() => {
-    const loadStatistics = async () => {
-      if (!session?.user?.email) return;
+  // Load data with caching
+  const loadStatistics = useCallback(async () => {
+    if (!session?.user?.email) return;
 
-      setLoading(true);
-      try {
-        // Load daily logs
-        const logsRef = collection(db, 'users', session.user.email, 'daily_logs');
-        const snapshot = await getDocs(logsRef);
-        
-        // Load completed surahs count
-        const surahRef = collection(db, 'users', session.user.email, 'surah_completed');
-        const surahSnapshot = await getDocs(surahRef);
-        setCompletedSurahsCount(surahSnapshot.size);
-        
-        const logs: DailyLog[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data() as DailyLog;
-          logs.push(data);
-        });
+    setLoading(true);
+    try {
+      // Check cache first
+      const cachedLogs = getFromCache<DailyLog[]>(getCacheKey(session.user.email, 'logs'));
+      const cachedSurahsCount = getFromCache<number>(getCacheKey(session.user.email, 'surahs'));
 
-        setDailyLogs(logs);
-
-        // Hitung statistik per kategori
-        const categoryMap = new Map<string, { completed: number; pending: number }>();
-        const activityMap = new Map<string, { count: number; category: string }>();
-        let totalCompleted = 0;
-        let totalPending = 0;
-
-        logs.forEach((log) => {
-          Object.values(log.activities).forEach((activity) => {
-            const category = activity.category;
-            
-            // Category stats
-            if (!categoryMap.has(category)) {
-              categoryMap.set(category, { completed: 0, pending: 0 });
-            }
-            const stats = categoryMap.get(category)!;
-            if (activity.status === 'completed') {
-              stats.completed++;
-              totalCompleted++;
-              
-              // Top activities (hanya yang completed)
-              const actKey = activity.name;
-              if (!activityMap.has(actKey)) {
-                activityMap.set(actKey, { count: 0, category });
-              }
-              activityMap.get(actKey)!.count++;
-            } else {
-              stats.pending++;
-              totalPending++;
-            }
-          });
-        });
-
-        const categoryData = Array.from(categoryMap.entries()).map(([name, stats]) => ({
-          name,
-          completed: stats.completed,
-          pending: stats.pending,
-        }));
-
-        // Top 5 aktivitas paling sering diselesaikan
-        const topActs = Array.from(activityMap.entries())
-          .map(([name, data]) => ({ name, ...data }))
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 5);
-        setTopActivities(topActs);
-
-        // Kategori dengan completion rate tertinggi
-        const categoryRates = categoryData
-          .map(cat => ({
-            name: cat.name,
-            rate: cat.completed + cat.pending > 0 
-              ? Math.round((cat.completed / (cat.completed + cat.pending)) * 100)
-              : 0
-          }))
-          .sort((a, b) => b.rate - a.rate);
-        setBestCategory(categoryRates[0] || null);
-        setWeakestCategory(categoryRates[categoryRates.length - 1] || null);
-
-        // Hitung hari paling produktif (berdasarkan completion rate per hari dalam seminggu)
-        const weekdayStats = Array.from({ length: 7 }, () => ({ completed: 0, total: 0 }));
-        logs.forEach((log) => {
-          const dayIdx = new Date(log.date).getDay();
-          Object.values(log.activities).forEach((activity) => {
-            weekdayStats[dayIdx].total += 1;
-            if (activity.status === 'completed') {
-              weekdayStats[dayIdx].completed += 1;
-            }
-          });
-        });
-        const weekdayRates = weekdayStats.map((stat, idx) => ({
-          name: WEEKDAY_NAMES[idx],
-          total: stat.total,
-          rate: stat.total > 0 ? Math.round((stat.completed / stat.total) * 100) : 0,
-        }));
-        const productiveDay = weekdayRates
-          .filter((w) => w.total > 0)
-          .sort((a, b) => b.rate - a.rate)[0] || null;
-        setBestDayOfWeek(productiveDay);
-
-        // Momentum 7 hari terakhir vs 7 hari sebelumnya
-        const sortedLogsFull = logs.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        const computeRate = (items: DailyLog[]) => {
-          let completed = 0;
-          let total = 0;
-          items.forEach((log) => {
-            Object.values(log.activities).forEach((act) => {
-              total++;
-              if (act.status === 'completed') completed++;
-            });
-          });
-          return total > 0 ? Math.round((completed / total) * 100) : 0;
-        };
-        const recentLogs = sortedLogsFull.slice(0, 7);
-        const previousLogs = sortedLogsFull.slice(7, 14);
-        const recentRate = computeRate(recentLogs);
-        const previousRate = computeRate(previousLogs);
-        setRecentCompletionRate(recentRate);
-        setMomentumChange(recentRate - previousRate);
-
-        // Hitung streak (hari berturut-turut dengan aktivitas completed)
-        const sortedLogs = logs
-          .map(log => ({
-            date: new Date(log.date),
-            hasCompleted: Object.values(log.activities).some(act => act.status === 'completed')
-          }))
-          .sort((a, b) => b.date.getTime() - a.date.getTime());
-
-        let streak = 0;
-        for (let i = 0; i < sortedLogs.length; i++) {
-          if (sortedLogs[i].hasCompleted) {
-            streak++;
-            // Check if next day is consecutive
-            if (i < sortedLogs.length - 1) {
-              const currentDate = sortedLogs[i].date;
-              const nextDate = sortedLogs[i + 1].date;
-              const diffDays = Math.floor((currentDate.getTime() - nextDate.getTime()) / (1000 * 60 * 60 * 24));
-              if (diffDays > 1) break; // Gap ditemukan
-            }
-          } else {
-            break;
-          }
-        }
-        setCurrentStreak(streak);
-
-        // Hitung Perfect Days (hari dengan 100% completion)
-        let perfectDaysCount = 0;
-        logs.forEach((log) => {
-          const activities = Object.values(log.activities);
-          if (activities.length > 0) {
-            const allCompleted = activities.every(act => act.status === 'completed');
-            if (allCompleted) {
-              perfectDaysCount++;
-            }
-          }
-        });
-        setPerfectDays(perfectDaysCount);
-
-        setCategoryStats(categoryData);
-        setOverallStats({
-          total: totalCompleted + totalPending,
-          completed: totalCompleted,
-          pending: totalPending,
-        });
-      } catch (error) {
-        console.error('Gagal memuat statistik:', error);
-      } finally {
+      if (cachedLogs && cachedSurahsCount !== null) {
+        setDailyLogs(cachedLogs);
+        setCompletedSurahsCount(cachedSurahsCount);
         setLoading(false);
+        return;
       }
-    };
 
+      // Load daily logs
+      const logsRef = collection(db, 'users', session.user.email, 'daily_logs');
+      const snapshot = await getDocs(logsRef);
+      
+      const surahRef = collection(db, 'users', session.user.email, 'surah_completed');
+      const surahSnapshot = await getDocs(surahRef);
+      const surahCount = surahSnapshot.size;
+      setCompletedSurahsCount(surahCount);
+      
+      const logs: DailyLog[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data() as DailyLog;
+        logs.push(data);
+      });
+
+      // Save to cache
+      saveToCache(getCacheKey(session.user.email, 'logs'), logs);
+      saveToCache(getCacheKey(session.user.email, 'surahs'), surahCount);
+
+      setDailyLogs(logs);
+    } catch (error) {
+      console.error('Gagal memuat statistik:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [session?.user?.email]);
+
+  useEffect(() => {
     loadStatistics();
-  }, [session]);
+  }, [loadStatistics]);
+
+  // Memoized calculations for category stats
+  const { categoryStats, overallStats, topActivities } = useMemo(() => {
+    if (dailyLogs.length === 0) {
+      return {
+        categoryStats: [],
+        overallStats: { total: 0, completed: 0, pending: 0 },
+        topActivities: []
+      };
+    }
+
+    // Hitung statistik per kategori
+    const categoryMap = new Map<string, { completed: number; pending: number }>();
+    const activityMap = new Map<string, { count: number; category: string }>();
+    let totalCompleted = 0;
+    let totalPending = 0;
+
+    dailyLogs.forEach((log) => {
+      Object.values(log.activities).forEach((activity) => {
+        const category = activity.category;
+        
+        // Category stats
+        if (!categoryMap.has(category)) {
+          categoryMap.set(category, { completed: 0, pending: 0 });
+        }
+        const stats = categoryMap.get(category)!;
+        if (activity.status === 'completed') {
+          stats.completed++;
+          totalCompleted++;
+          
+          // Top activities (hanya yang completed)
+          const actKey = activity.name;
+          if (!activityMap.has(actKey)) {
+            activityMap.set(actKey, { count: 0, category });
+          }
+          activityMap.get(actKey)!.count++;
+        } else {
+          stats.pending++;
+          totalPending++;
+        }
+      });
+    });
+
+    const categoryData = Array.from(categoryMap.entries()).map(([name, stats]) => ({
+      name,
+      completed: stats.completed,
+      pending: stats.pending,
+    }));
+
+    // Top 5 aktivitas paling sering diselesaikan
+    const topActs = Array.from(activityMap.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    return {
+      categoryStats: categoryData,
+      overallStats: {
+        total: totalCompleted + totalPending,
+        completed: totalCompleted,
+        pending: totalPending,
+      },
+      topActivities: topActs
+    };
+  }, [dailyLogs]);
+
+  // Memoized best/weakest category calculation
+  const { bestCategory, weakestCategory } = useMemo(() => {
+    if (categoryStats.length === 0) {
+      return { bestCategory: null, weakestCategory: null };
+    }
+
+    // Kategori dengan completion rate tertinggi
+    const categoryRates = categoryStats
+      .map(cat => ({
+        name: cat.name,
+        rate: cat.completed + cat.pending > 0 
+          ? Math.round((cat.completed / (cat.completed + cat.pending)) * 100)
+          : 0
+      }))
+      .sort((a, b) => b.rate - a.rate);
+    
+    return {
+      bestCategory: categoryRates[0] || null,
+      weakestCategory: categoryRates[categoryRates.length - 1] || null
+    };
+  }, [categoryStats]);
+
+  // Memoized weekday stats
+  const bestDayOfWeek = useMemo(() => {
+
+    if (dailyLogs.length === 0) return null;
+
+    // Hitung hari paling produktif (berdasarkan completion rate per hari dalam seminggu)
+    const weekdayStats = Array.from({ length: 7 }, () => ({ completed: 0, total: 0 }));
+    dailyLogs.forEach((log) => {
+      const dayIdx = new Date(log.date).getDay();
+      Object.values(log.activities).forEach((activity) => {
+        weekdayStats[dayIdx].total += 1;
+        if (activity.status === 'completed') {
+          weekdayStats[dayIdx].completed += 1;
+        }
+      });
+    });
+    const weekdayRates = weekdayStats.map((stat, idx) => ({
+      name: WEEKDAY_NAMES[idx],
+      total: stat.total,
+      rate: stat.total > 0 ? Math.round((stat.completed / stat.total) * 100) : 0,
+    }));
+    const productiveDay = weekdayRates
+      .filter((w) => w.total > 0)
+      .sort((a, b) => b.rate - a.rate)[0] || null;
+    
+    return productiveDay;
+  }, [dailyLogs]);
+
+  // Memoized momentum calculation
+  const { recentCompletionRate, momentumChange } = useMemo(() => {
+
+    if (dailyLogs.length === 0) {
+      return { recentCompletionRate: 0, momentumChange: 0 };
+    }
+
+    // Momentum 7 hari terakhir vs 7 hari sebelumnya
+    const sortedLogsFull = dailyLogs.slice().sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const computeRate = (items: DailyLog[]) => {
+      let completed = 0;
+      let total = 0;
+      items.forEach((log) => {
+        Object.values(log.activities).forEach((act) => {
+          total++;
+          if (act.status === 'completed') completed++;
+        });
+      });
+      return total > 0 ? Math.round((completed / total) * 100) : 0;
+    };
+    const recentLogs = sortedLogsFull.slice(0, 7);
+    const previousLogs = sortedLogsFull.slice(7, 14);
+    const recentRate = computeRate(recentLogs);
+    const previousRate = computeRate(previousLogs);
+    
+    return {
+      recentCompletionRate: recentRate,
+      momentumChange: recentRate - previousRate
+    };
+  }, [dailyLogs]);
+
+  // Memoized streak calculation
+  const currentStreak = useMemo(() => {
+
+    if (dailyLogs.length === 0) return 0;
+
+    // Hitung streak (hari berturut-turut dengan aktivitas completed)
+    const sortedLogs = dailyLogs
+      .map(log => ({
+        date: new Date(log.date),
+        hasCompleted: Object.values(log.activities).some(act => act.status === 'completed')
+      }))
+      .sort((a, b) => b.date.getTime() - a.date.getTime());
+
+    let streak = 0;
+    for (let i = 0; i < sortedLogs.length; i++) {
+      if (sortedLogs[i].hasCompleted) {
+        streak++;
+        // Check if next day is consecutive
+        if (i < sortedLogs.length - 1) {
+          const currentDate = sortedLogs[i].date;
+          const nextDate = sortedLogs[i + 1].date;
+          const diffDays = Math.floor((currentDate.getTime() - nextDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDays > 1) break; // Gap ditemukan
+        }
+      } else {
+        break;
+      }
+    }
+    
+    return streak;
+  }, [dailyLogs]);
+
+  // Memoized perfect days calculation
+  const perfectDays = useMemo(() => {
+
+    if (dailyLogs.length === 0) return 0;
+
+    // Hitung Perfect Days (hari dengan 100% completion)
+    let perfectDaysCount = 0;
+    dailyLogs.forEach((log) => {
+      const activities = Object.values(log.activities);
+      if (activities.length > 0) {
+        const allCompleted = activities.every(act => act.status === 'completed');
+        if (allCompleted) {
+          perfectDaysCount++;
+        }
+      }
+    });
+    
+    return perfectDaysCount;
+  }, [dailyLogs]);
 
   if (loading) {
     return (
@@ -810,3 +923,6 @@ export default function StatisticsSection() {
     </div>
   );
 }
+
+// Export with React.memo to prevent unnecessary re-renders
+export default React.memo(StatisticsSectionContent);
