@@ -523,15 +523,6 @@ export default function DashboardPage() {
 
       const dateKey = getDateKey(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
 
-      await addDoc(collection(db, 'events'), {
-        userEmail: session?.user?.email ?? null,
-        title: null,
-        description: null,
-        activities: selectedActivities,
-        eventDate,
-        createdAt: serverTimestamp(),
-      });
-
       // Simpan status harian ke subcollection daily_logs
       const userEmail = session?.user?.email ?? '';
       if (userEmail) {
