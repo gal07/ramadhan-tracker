@@ -3,7 +3,7 @@
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Users } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { addDoc, collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
@@ -15,7 +15,7 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  
+
   // Calendar states
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -27,12 +27,13 @@ export default function DashboardPage() {
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [activitiesError, setActivitiesError] = useState('');
   const [showView, setShowView] = useState<'calendar' | 'statistics'>('calendar');
-  
+
+
   // Notification permission states
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [showNotificationBanner, setShowNotificationBanner] = useState(false);
   const [notificationRequestStatus, setNotificationRequestStatus] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null);
-  
+
   // PWA installation states
   const [isAppInstalled, setIsAppInstalled] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -49,10 +50,10 @@ export default function DashboardPage() {
   useEffect(() => {
     if ('Notification' in window) {
       setNotificationPermission(Notification.permission);
-      
+
       // Check if banner was dismissed before
       const dismissed = localStorage.getItem('notification-banner-dismissed');
-      
+
       // Show banner if permission is default and not dismissed
       if (Notification.permission === 'default' && dismissed !== 'true') {
         setTimeout(() => {
@@ -102,8 +103,8 @@ export default function DashboardPage() {
     // Cek apakah sudah running di standalone mode (sudah diinstall)
     const checkInstalled = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                          (window.navigator as any).standalone === true || // iOS Safari
-                          document.referrer.includes('android-app://'); // Android TWA
+        (window.navigator as any).standalone === true || // iOS Safari
+        document.referrer.includes('android-app://'); // Android TWA
       setIsAppInstalled(isStandalone);
       return isStandalone;
     };
@@ -117,7 +118,7 @@ export default function DashboardPage() {
         e.preventDefault();
         setDeferredPrompt(e);
         setIsAppInstalled(false);
-        
+
         // Check if install banner was dismissed before
         const installDismissed = localStorage.getItem('install-banner-dismissed');
         if (installDismissed !== 'true') {
@@ -217,7 +218,7 @@ export default function DashboardPage() {
         setShowNotificationBanner(false);
         await showNotificationPreview();
         setNotificationRequestStatus({ type: 'success', message: 'Notifikasi berhasil diaktifkan.' });
-        
+
         // Simpan FCM Token setelah permission granted
         await saveFCMToken();
         return;
@@ -251,9 +252,9 @@ export default function DashboardPage() {
 
       // Tunggu service worker ready
       const registration = await navigator.serviceWorker.ready;
-      
+
       const messaging = getMessaging();
-      
+
       // Dapatkan FCM token dengan VAPID key
       // ⚠️ PENTING: Ganti dengan VAPID key dari Firebase Console
       // Firebase Console → Project Settings → Cloud Messaging → Web Push certificates
@@ -268,7 +269,7 @@ export default function DashboardPage() {
 
       if (token) {
         console.log('✅ FCM Token obtained:', token);
-        
+
         // Simpan token ke Firestore untuk tracking (opsional)
         const userEmail = session.user.email;
         await setDoc(
@@ -284,7 +285,7 @@ export default function DashboardPage() {
           },
           { merge: true }
         );
-        
+
         console.log('✅ FCM token saved to Firestore for:', userEmail);
       } else {
         console.warn('⚠️ No FCM token available. Service worker masih belum fully registered, atau VAPID key belum diset.');
@@ -310,17 +311,17 @@ export default function DashboardPage() {
     try {
       // Show the install prompt
       deferredPrompt.prompt();
-      
+
       // Wait for the user's response
       const { outcome } = await deferredPrompt.userChoice;
-      
+
       if (outcome === 'accepted') {
         console.log('User accepted the install prompt');
         setShowInstallBanner(false);
       } else {
         console.log('User dismissed the install prompt');
       }
-      
+
       // Clear the deferredPrompt
       setDeferredPrompt(null);
     } catch (error) {
@@ -379,7 +380,7 @@ export default function DashboardPage() {
     setIsLoggingOut(true);
     try {
       // SignOut akan clear session dan cookies
-      await signOut({ 
+      await signOut({
         redirect: false // Jangan auto redirect, kita handle manual
       });
       // Force redirect menggunakan window.location untuk clear semua state
@@ -413,18 +414,18 @@ export default function DashboardPage() {
   const daysInMonth = getDaysInMonth(currentDate);
   const firstDay = getFirstDayOfMonth(currentDate);
   const today = new Date();
-  const isCurrentMonth = 
-    currentDate.getMonth() === today.getMonth() && 
+  const isCurrentMonth =
+    currentDate.getMonth() === today.getMonth() &&
     currentDate.getFullYear() === today.getFullYear();
 
   // Generate array of days
   const days = [];
-  
+
   // Empty cells before first day
   for (let i = 0; i < firstDay; i++) {
     days.push(null);
   }
-  
+
   // Days of the month
   for (let i = 1; i <= daysInMonth; i++) {
     days.push(i);
@@ -460,8 +461,8 @@ export default function DashboardPage() {
   // Cek apakah bulan saat ini memiliki hari-hari Ramadhan
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
-  const hasRamadhanDays = 
-    currentYear === RAMADHAN_YEAR && 
+  const hasRamadhanDays =
+    currentYear === RAMADHAN_YEAR &&
     (currentMonth === 1 || currentMonth === 2); // Februari atau Maret
 
   const handleToggleActivity = (activityId: string) => {
@@ -479,7 +480,7 @@ export default function DashboardPage() {
       setTimeout(() => setShowNotification(false), 3000);
       return;
     }
-    
+
     setSelectedDay(day);
     setSelectedActivities([]);
     setShowEventModal(true);
@@ -563,6 +564,8 @@ export default function DashboardPage() {
     }
   };
 
+
+
   if (isLoggingOut) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -588,13 +591,12 @@ export default function DashboardPage() {
         <div className="max-w-6xl mx-auto">
           {notificationRequestStatus && (
             <div
-              className={`mb-4 rounded-xl border p-3 text-sm flex items-center gap-2 ${
-                notificationRequestStatus.type === 'success'
-                  ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
-                  : notificationRequestStatus.type === 'error'
+              className={`mb-4 rounded-xl border p-3 text-sm flex items-center gap-2 ${notificationRequestStatus.type === 'success'
+                ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
+                : notificationRequestStatus.type === 'error'
                   ? 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
                   : 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200'
-              }`}
+                }`}
             >
               <span className="text-base">🔔</span>
               <span>{notificationRequestStatus.message}</span>
@@ -761,16 +763,14 @@ export default function DashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
                 <button
                   onClick={() => setShowView('calendar')}
-                  className={`p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left ${
-                    showView === 'calendar'
-                      ? 'bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
+                  className={`p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left ${showView === 'calendar'
+                    ? 'bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
                 >
                   <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      showView === 'calendar' ? 'bg-white/20' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${showView === 'calendar' ? 'bg-white/20' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}>
                       <svg
                         className="w-5 h-5"
                         fill="none"
@@ -787,25 +787,22 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-sm">Kalender Ramadhan</h3>
-                      <p className={`text-xs ${
-                        showView === 'calendar' ? 'text-[#e8f1fb]' : 'text-gray-500 dark:text-gray-400'
-                      }`}>Kelola ibadah Anda</p>
+                      <p className={`text-xs ${showView === 'calendar' ? 'text-[#e8f1fb]' : 'text-gray-500 dark:text-gray-400'
+                        }`}>Kelola ibadah Anda</p>
                     </div>
                   </div>
                 </button>
 
                 <button
                   onClick={() => setShowView('statistics')}
-                  className={`p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left ${
-                    showView === 'statistics'
-                      ? 'bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
+                  className={`p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left ${showView === 'statistics'
+                    ? 'bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
                 >
                   <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      showView === 'statistics' ? 'bg-white/20' : 'bg-gray-300 dark:bg-gray-600'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${showView === 'statistics' ? 'bg-white/20' : 'bg-gray-300 dark:bg-gray-600'
+                      }`}>
                       <svg
                         className="w-5 h-5"
                         fill="none"
@@ -822,142 +819,158 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-sm">Statistik</h3>
-                      <p className={`text-xs ${
-                        showView === 'statistics' ? 'text-[#e8f1fb]' : 'text-gray-500 dark:text-gray-400'
-                      }`}>Lihat progress Anda</p>
+                      <p className={`text-xs ${showView === 'statistics' ? 'text-[#e8f1fb]' : 'text-gray-500 dark:text-gray-400'
+                        }`}>Lihat progress Anda</p>
                     </div>
                   </div>
                 </button>
 
-                  <button
-                    onClick={() => router.push('/doa')}
-                    className="p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gray-300 dark:bg-gray-600">
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                          />
-                        </svg>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-sm">🤲 Doa-Doa Harian</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Kumpulan doa lengkap</p>
-                      </div>
+                <button
+                  onClick={() => router.push('/doa')}
+                  className="p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gray-300 dark:bg-gray-600">
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                        />
+                      </svg>
                     </div>
-                  </button>
+                    <div>
+                      <h3 className="font-semibold text-sm">🤲 Doa-Doa Harian</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Kumpulan doa lengkap</p>
+                    </div>
+                  </div>
+                </button>
 
-                  <button
-                    onClick={() => router.push('/quran')}
-                    className="p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gray-300 dark:bg-gray-600">
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 5a2 2 0 012-2h7.5a2 2 0 012 2v13a1 1 0 01-1.447.894L10 17.118l-4.053 1.776A1 1 0 014 18V5zm15 0a2 2 0 00-2-2h-.5a.5.5 0 00-.5.5V5"
-                          />
-                        </svg>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-sm">📖 Baca Qur'an</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Mushaf ringan & cepat</p>
-                      </div>
+                <button
+                  onClick={() => router.push('/quran')}
+                  className="p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gray-300 dark:bg-gray-600">
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 5a2 2 0 012-2h7.5a2 2 0 012 2v13a1 1 0 01-1.447.894L10 17.118l-4.053 1.776A1 1 0 014 18V5zm15 0a2 2 0 00-2-2h-.5a.5.5 0 00-.5.5V5"
+                        />
+                      </svg>
                     </div>
-                  </button>
+                    <div>
+                      <h3 className="font-semibold text-sm">📖 Baca Qur'an</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Mushaf ringan & cepat</p>
+                    </div>
+                  </div>
+                </button>
+
+
+
+                <button
+                  onClick={() => router.push('/friends')}
+                  className="p-4 rounded-xl shadow-lg hover:shadow-xl transition-all text-left bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-gray-300 dark:bg-gray-600">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm">Teman</h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Tambah teman</p>
+                    </div>
+                  </div>
+                </button>
               </div>
             </div>
 
             {/* Calendar or Statistics View */}
             {showView === 'calendar' ? (
-            <div>
-              {/* Ramadhan Badge */}
-              {hasRamadhanDays && (
-                <div className="mb-4 p-3 bg-linear-to-r from-[#2f67b2] to-[#6bc6e5] text-white rounded-lg text-center">
-                  <p className="font-semibold">🌙 Bulan Ramadhan 1447 H</p>
-                  <p className="text-sm mt-1">
-                    {currentMonth === 1 
-                      ? "18 Februari - 28 Februari 2026" 
-                      : "1 Maret - 19 Maret 2026"}
-                    {" • Klik tanggal untuk membuat event ibadah"}
-                  </p>
-                </div>
-              )}
-
-              {/* Calendar Header */}
-              <div className="flex items-center justify-between mb-6">
-                <button
-                  onClick={previousMonth}
-                  className="p-2 text-[#2f67b2] dark:text-[#6bc6e5] hover:bg-[#e8f1fb] dark:hover:bg-[#1f4f91]/30 rounded-lg transition-colors"
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                
-                <div className="flex items-center gap-4">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
-                  </h2>
-                  {!isCurrentMonth && (
-                    <button
-                      onClick={goToToday}
-                      className="text-sm text-[#2f67b2] hover:text-[#1f4f91] dark:text-[#6bc6e5] dark:hover:text-[#2f67b2] font-medium"
-                    >
-                      Hari Ini
-                    </button>
-                  )}
-                </div>
-                
-                <button
-                  onClick={nextMonth}
-                  className="p-2 text-[#2f67b2] dark:text-[#6bc6e5] hover:bg-[#e8f1fb] dark:hover:bg-[#1f4f91]/30 rounded-lg transition-colors"
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Day Names */}
-              <div className="grid grid-cols-7 gap-2 mb-2">
-                {dayNames.map((day) => (
-                  <div
-                    key={day}
-                    className="text-center text-sm font-semibold text-gray-600 dark:text-gray-400 py-2"
-                  >
-                    {day}
+              <div>
+                {/* Ramadhan Badge */}
+                {hasRamadhanDays && (
+                  <div className="mb-4 p-3 bg-linear-to-r from-[#2f67b2] to-[#6bc6e5] text-white rounded-lg text-center">
+                    <p className="font-semibold">🌙 Bulan Ramadhan 1447 H</p>
+                    <p className="text-sm mt-1">
+                      {currentMonth === 1
+                        ? "18 Februari - 28 Februari 2026"
+                        : "1 Maret - 19 Maret 2026"}
+                      {" • Klik tanggal untuk membuat event ibadah"}
+                    </p>
                   </div>
-                ))}
-              </div>
+                )}
 
-              {/* Calendar Grid */}
-              <div className="grid grid-cols-7 gap-2">
-                {days.map((day, index) => {
-                  const isToday = 
-                    isCurrentMonth && 
-                    day === today.getDate();
-                  
-                  const isRamadhanDay = day ? isDateInRamadhan(day) : false;
-                  
-                  return (
+                {/* Calendar Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <button
+                    onClick={previousMonth}
+                    className="p-2 text-[#2f67b2] dark:text-[#6bc6e5] hover:bg-[#e8f1fb] dark:hover:bg-[#1f4f91]/30 rounded-lg transition-colors"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+
+                  <div className="flex items-center gap-4">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                    </h2>
+                    {!isCurrentMonth && (
+                      <button
+                        onClick={goToToday}
+                        className="text-sm text-[#2f67b2] hover:text-[#1f4f91] dark:text-[#6bc6e5] dark:hover:text-[#2f67b2] font-medium"
+                      >
+                        Hari Ini
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={nextMonth}
+                    className="p-2 text-[#2f67b2] dark:text-[#6bc6e5] hover:bg-[#e8f1fb] dark:hover:bg-[#1f4f91]/30 rounded-lg transition-colors"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Day Names */}
+                <div className="grid grid-cols-7 gap-2 mb-2">
+                  {dayNames.map((day) => (
                     <div
-                      key={index}
-                      onClick={() => day && handleDayClick(day)}
-                      className={`
+                      key={day}
+                      className="text-center text-sm font-semibold text-gray-600 dark:text-gray-400 py-2"
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar Grid */}
+                <div className="grid grid-cols-7 gap-2">
+                  {days.map((day, index) => {
+                    const isToday =
+                      isCurrentMonth &&
+                      day === today.getDate();
+
+                    const isRamadhanDay = day ? isDateInRamadhan(day) : false;
+
+                    return (
+                      <div
+                        key={index}
+                        onClick={() => day && handleDayClick(day)}
+                        className={`
                         aspect-square flex items-center justify-center rounded-lg
                         ${day ? 'cursor-pointer' : ''}
                         ${day && isRamadhanDay ? 'hover:bg-[#e8f1fb] dark:hover:bg-[#1f4f91]/30 hover:ring-2 hover:ring-[#2f67b2]' : ''}
@@ -967,37 +980,37 @@ export default function DashboardPage() {
                         ${day && !isToday && !isRamadhanDay ? 'text-gray-900 dark:text-gray-100' : ''}
                         transition-all
                       `}
-                    >
-                      {day && (
-                        <span className="text-sm md:text-base">
-                          {day}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                      >
+                        {day && (
+                          <span className="text-sm md:text-base">
+                            {day}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
 
-              {/* Legend */}
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex flex-wrap items-center gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-[#2f67b2] rounded"></div>
-                    <span className="text-gray-600 dark:text-gray-400">Hari Ini</span>
-                  </div>
-                  {hasRamadhanDays && (
+                {/* Legend */}
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-wrap items-center gap-4 text-sm">
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 bg-[#e8f1fb] dark:bg-[#1f4f91]/20 rounded border-2 border-[#2f67b2]"></div>
-                      <span className="text-gray-600 dark:text-gray-400">Hari Ramadhan (18 Feb - 19 Mar)</span>
+                      <div className="w-4 h-4 bg-[#2f67b2] rounded"></div>
+                      <span className="text-gray-600 dark:text-gray-400">Hari Ini</span>
                     </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600"></div>
-                    <span className="text-gray-600 dark:text-gray-400">Hari Biasa</span>
+                    {hasRamadhanDays && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 bg-[#e8f1fb] dark:bg-[#1f4f91]/20 rounded border-2 border-[#2f67b2]"></div>
+                        <span className="text-gray-600 dark:text-gray-400">Hari Ramadhan (18 Feb - 19 Mar)</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-gray-100 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-600"></div>
+                      <span className="text-gray-600 dark:text-gray-400">Hari Biasa</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
             ) : (
               <StatisticsSection />
             )}
@@ -1175,6 +1188,10 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+
+
+
     </div>
   );
 }
