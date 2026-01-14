@@ -69,14 +69,21 @@ export default function FriendsPage() {
 
         setProcessing(true);
         try {
-            // Use email as document ID for uniqueness
+            // 1. Add Friend to Current User's list
             await setDoc(doc(db, 'users', userEmail, 'friends', decodedText), {
                 email: decodedText,
-                name: decodedText.split('@')[0], // Default name from email part
+                name: decodedText.split('@')[0],
                 addedAt: serverTimestamp(),
             });
 
-            alert(`Berhasil menambahkan ${decodedText}!`);
+            // 2. Add Current User to Friend's list (Mutual)
+            await setDoc(doc(db, 'users', decodedText, 'friends', userEmail), {
+                email: userEmail,
+                name: session?.user?.name || userEmail.split('@')[0],
+                addedAt: serverTimestamp(),
+            });
+
+            alert(`Berhasil menambahkan ${decodedText} dan Anda juga ditambahkan ke daftar teman mereka!`);
             setActiveTab('list');
         } catch (error) {
             console.error('Error adding friend:', error);
@@ -239,7 +246,11 @@ export default function FriendsPage() {
                                 {loading && <p className="text-center text-gray-500">Memuat...</p>}
 
                                 {!loading && friends.map(friend => (
-                                    <div key={friend.id} className="flex items-center gap-3 p-3 bg-white dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm group">
+                                    <div
+                                        key={friend.id}
+                                        onClick={() => router.push(`/friends/${encodeURIComponent(friend.email)}`)}
+                                        className="flex items-center gap-3 p-3 bg-white dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm group cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                    >
                                         <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#2f67b2] to-[#6bc6e5] flex items-center justify-center text-white font-bold">
                                             {friend.name?.charAt(0).toUpperCase() || '?'}
                                         </div>
@@ -248,7 +259,10 @@ export default function FriendsPage() {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{friend.email}</p>
                                         </div>
                                         <button
-                                            onClick={() => handleDeleteFriend(friend.id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteFriend(friend.id);
+                                            }}
                                             className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                         >
                                             <Trash2 className="w-4 h-4" />

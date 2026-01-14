@@ -56,15 +56,15 @@ const getFromCache = <T,>(key: string): T | null => {
   try {
     const cached = localStorage.getItem(key);
     if (!cached) return null;
-    
+
     const entry: CacheEntry<T> = JSON.parse(cached);
     const isExpired = Date.now() - entry.timestamp > CACHE_DURATION;
-    
+
     if (isExpired) {
       localStorage.removeItem(key);
       return null;
     }
-    
+
     return entry.data;
   } catch (err) {
     console.warn('Cache read error:', err);
@@ -82,21 +82,27 @@ const saveToCache = <T,>(key: string, data: T) => {
   }
 };
 
-function StatisticsSectionContent() {
+interface StatisticsSectionProps {
+  userEmail?: string;
+}
+
+function StatisticsSectionContent({ userEmail }: StatisticsSectionProps) {
   const { data: session } = useSession();
+  const emailToUse = userEmail || session?.user?.email;
+
   const [loading, setLoading] = useState(true);
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([]);
   const [completedSurahsCount, setCompletedSurahsCount] = useState(0);
 
   // Load data with caching
   const loadStatistics = useCallback(async () => {
-    if (!session?.user?.email) return;
+    if (!emailToUse) return;
 
     setLoading(true);
     try {
       // Check cache first
-      const cachedLogs = getFromCache<DailyLog[]>(getCacheKey(session.user.email, 'logs'));
-      const cachedSurahsCount = getFromCache<number>(getCacheKey(session.user.email, 'surahs'));
+      const cachedLogs = getFromCache<DailyLog[]>(getCacheKey(emailToUse, 'logs'));
+      const cachedSurahsCount = getFromCache<number>(getCacheKey(emailToUse, 'surahs'));
 
       if (cachedLogs && cachedSurahsCount !== null) {
         setDailyLogs(cachedLogs);
@@ -106,14 +112,14 @@ function StatisticsSectionContent() {
       }
 
       // Load daily logs
-      const logsRef = collection(db, 'users', session.user.email, 'daily_logs');
+      const logsRef = collection(db, 'users', emailToUse, 'daily_logs');
       const snapshot = await getDocs(logsRef);
-      
-      const surahRef = collection(db, 'users', session.user.email, 'surah_completed');
+
+      const surahRef = collection(db, 'users', emailToUse, 'surah_completed');
       const surahSnapshot = await getDocs(surahRef);
       const surahCount = surahSnapshot.size;
       setCompletedSurahsCount(surahCount);
-      
+
       const logs: DailyLog[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data() as DailyLog;
@@ -121,8 +127,8 @@ function StatisticsSectionContent() {
       });
 
       // Save to cache
-      saveToCache(getCacheKey(session.user.email, 'logs'), logs);
-      saveToCache(getCacheKey(session.user.email, 'surahs'), surahCount);
+      saveToCache(getCacheKey(emailToUse, 'logs'), logs);
+      saveToCache(getCacheKey(emailToUse, 'surahs'), surahCount);
 
       setDailyLogs(logs);
     } catch (error) {
@@ -130,7 +136,7 @@ function StatisticsSectionContent() {
     } finally {
       setLoading(false);
     }
-  }, [session?.user?.email]);
+  }, [emailToUse]);
 
   useEffect(() => {
     loadStatistics();
@@ -155,7 +161,7 @@ function StatisticsSectionContent() {
     dailyLogs.forEach((log) => {
       Object.values(log.activities).forEach((activity) => {
         const category = activity.category;
-        
+
         // Category stats
         if (!categoryMap.has(category)) {
           categoryMap.set(category, { completed: 0, pending: 0 });
@@ -164,7 +170,7 @@ function StatisticsSectionContent() {
         if (activity.status === 'completed') {
           stats.completed++;
           totalCompleted++;
-          
+
           // Top activities (hanya yang completed)
           const actKey = activity.name;
           if (!activityMap.has(actKey)) {
@@ -211,12 +217,12 @@ function StatisticsSectionContent() {
     const categoryRates = categoryStats
       .map(cat => ({
         name: cat.name,
-        rate: cat.completed + cat.pending > 0 
+        rate: cat.completed + cat.pending > 0
           ? Math.round((cat.completed / (cat.completed + cat.pending)) * 100)
           : 0
       }))
       .sort((a, b) => b.rate - a.rate);
-    
+
     return {
       bestCategory: categoryRates[0] || null,
       weakestCategory: categoryRates[categoryRates.length - 1] || null
@@ -247,7 +253,7 @@ function StatisticsSectionContent() {
     const productiveDay = weekdayRates
       .filter((w) => w.total > 0)
       .sort((a, b) => b.rate - a.rate)[0] || null;
-    
+
     return productiveDay;
   }, [dailyLogs]);
 
@@ -275,7 +281,7 @@ function StatisticsSectionContent() {
     const previousLogs = sortedLogsFull.slice(7, 14);
     const recentRate = computeRate(recentLogs);
     const previousRate = computeRate(previousLogs);
-    
+
     return {
       recentCompletionRate: recentRate,
       momentumChange: recentRate - previousRate
@@ -310,7 +316,7 @@ function StatisticsSectionContent() {
         break;
       }
     }
-    
+
     return streak;
   }, [dailyLogs]);
 
@@ -330,7 +336,7 @@ function StatisticsSectionContent() {
         }
       }
     });
-    
+
     return perfectDaysCount;
   }, [dailyLogs]);
 
@@ -367,8 +373,8 @@ function StatisticsSectionContent() {
     );
   }
 
-  const completionRate = overallStats.total > 0 
-    ? Math.round((overallStats.completed / overallStats.total) * 100) 
+  const completionRate = overallStats.total > 0
+    ? Math.round((overallStats.completed / overallStats.total) * 100)
     : 0;
 
   const pieData = [
@@ -423,7 +429,7 @@ function StatisticsSectionContent() {
         </div>
       </div>
 
-      
+
       {/* Menuju Khatam Quran Card */}
       <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-xl p-6 shadow-lg border-t-4 border-green-500">
         <div className="flex items-center gap-2 mb-4">
@@ -456,11 +462,11 @@ function StatisticsSectionContent() {
               </div>
             </div>
           </div>
-          
+
           {/* Progress Bar */}
           <div className="relative">
             <div className="overflow-hidden h-3 text-xs flex rounded-full bg-green-200 dark:bg-green-900/40">
-              <div 
+              <div
                 style={{ width: `${(completedSurahsCount / 114) * 100}%` }}
                 className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-green-500 to-emerald-500 transition-all duration-500"
               ></div>
@@ -796,12 +802,11 @@ function StatisticsSectionContent() {
               topActivities.map((activity, index) => (
                 <div key={activity.name} className="flex items-center justify-between p-3 bg-linear-to-br from-[#2f67b2]/5 to-[#6bc6e5]/10 dark:from-[#2f67b2]/10 dark:to-[#6bc6e5]/20 rounded-lg border border-[#2f67b2]/20 dark:border-[#2f67b2]/30 hover:from-[#2f67b2]/10 hover:to-[#6bc6e5]/20 transition-all duration-200">
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-lg ${
-                      index === 0 ? 'bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white' :
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-lg ${index === 0 ? 'bg-linear-to-br from-[#2f67b2] to-[#1f4f91] text-white' :
                       index === 1 ? 'bg-linear-to-br from-[#4a8ed8] to-[#3f7fca] text-white' :
-                      index === 2 ? 'bg-linear-to-br from-[#6bc6e5] to-[#4a8ed8] text-white' :
-                      'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
-                    }`}>
+                        index === 2 ? 'bg-linear-to-br from-[#6bc6e5] to-[#4a8ed8] text-white' :
+                          'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                      }`}>
                       {index + 1}
                     </div>
                     <div>
@@ -925,4 +930,6 @@ function StatisticsSectionContent() {
 }
 
 // Export with React.memo to prevent unnecessary re-renders
-export default React.memo(StatisticsSectionContent);
+export default function StatisticsSection(props: StatisticsSectionProps) {
+  return <StatisticsSectionContent {...props} />;
+}
