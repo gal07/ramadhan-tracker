@@ -16,9 +16,8 @@ export default function QRScanner({ onScanSuccess, onScanFailure }: QRScannerPro
     useEffect(() => {
         const scannerId = 'reader';
 
-        // Cleanup function for previous instance if exists
         if (scannerRef.current) {
-            scannerRef.current.clear().catch(console.error);
+            scannerRef.current.clear();
         }
 
         const scanner = new Html5Qrcode(scannerId);
