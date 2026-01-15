@@ -56,7 +56,7 @@ export async function requestNotificationPermission(): Promise<string | null> {
     console.log('[FCM] Service worker ready:', registration.scope);
 
     const messaging = getMessaging(app);
-    
+
     // Get token with explicit service worker registration
     const token = await getToken(messaging, {
       vapidKey: process.env.NEXT_PUBLIC_FCM_VAPID_KEY,
@@ -84,9 +84,10 @@ export function setupForegroundNotifications(): void {
       const notificationTitle = payload.notification?.title || 'Ramadhan Tracker';
       const notificationOptions: NotificationOptions = {
         body: payload.notification?.body || 'Ada notifikasi baru',
-        icon: payload.notification?.icon || '/icon512_maskable.png',
+        icon: '/icon512_maskable.png',
         badge: '/ybm_logo.png',
         tag: 'ramadhan-notification',
+        requireInteraction: true, // Keep notification until user interacts
         data: payload.data,
       };
 
@@ -94,11 +95,17 @@ export function setupForegroundNotifications(): void {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then((registration) => {
           console.log('[FCM] Showing foreground notification via service worker');
-          registration.showNotification(notificationTitle, notificationOptions);
-        });
+          // Some browsers suppress notifications if the tab is focused.
+          // We force it, but if it fails, we log it.
+          registration.showNotification(notificationTitle, notificationOptions)
+            .catch(err => console.error('[FCM] Service Worker showNotification failed:', err));
+        }).catch(err => console.error('[FCM] Service Worker not ready:', err));
+      } else {
+        // Fallback for non-SW environments (rare for PWA)
+        new Notification(notificationTitle, notificationOptions);
       }
     });
-    
+
     console.log('[FCM] Foreground notifications setup complete');
   } catch (error) {
     console.error('[FCM] Failed to setup foreground notifications:', error);

@@ -46,7 +46,7 @@ try {
     appId: "1:900979907746:web:bb05c7409291d34da4cbfb",
   });
   console.log('[SW] Firebase initialized successfully');
-  
+
   messaging = firebase.messaging();
 
   // ========================================================================
@@ -55,7 +55,7 @@ try {
   // ========================================================================
   messaging.onBackgroundMessage((payload) => {
     console.log('[SW] Background FCM message received:', payload);
-    
+
     const notificationTitle = payload.notification?.title || 'Ramadhan Tracker';
     const notificationOptions = {
       body: payload.notification?.body || 'Ada notifikasi baru',
@@ -67,9 +67,10 @@ try {
       data: payload.data || {},
     };
 
-    return self.registration.showNotification(notificationTitle, notificationOptions);
+    return self.registration.showNotification(notificationTitle, notificationOptions)
+      .catch((err) => console.error('[SW] Background showNotification failed:', err));
   });
-  
+
   console.log('[SW] Firebase Messaging initialized and listening for background messages');
 } catch (error) {
   console.error('[SW] Firebase initialization error:', error);
@@ -152,7 +153,7 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification clicked:', event.notification.tag);
   event.notification.close();
-  
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {

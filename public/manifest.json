@@ -1,5 +1,6 @@
 {
   "name": "Ramadhan Tracker By YBM BRILian",
+  "gcm_sender_id": "103953800507",
   "short_name": "Ramadhan Tracker",
   "description": "Aplikasi untuk mencatat dan melacak ibadah selama bulan Ramadhan",
   "start_url": "/",
